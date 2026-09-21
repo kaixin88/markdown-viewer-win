@@ -5,19 +5,25 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Build (net48, x64)
-        run: dotnet build MarkdownViewer/MarkdownViewer.csproj -c Release
+      - name: Build net48 (MSBuild)
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $msbuild = & $vswhere -latest -requires Microsoft.Component.MSBuild -find "MSBuild\Current\Bin\MSBuild.exe"
+          if (-not (Test-Path $msbuild)) {
+            $msbuild = & $vswhere -latest -find "MSBuild\**\Bin\MSBuild.exe"
+          }
+          Write-Host "MSBuild: $msbuild"
+          & $msbuild "${{ github.workspace }}\MarkdownViewer\MarkdownViewer.csproj" /p:Configuration=Release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -29,7 +35,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           tag: latest
-          name: 最新构建
+          name: latest build
           allowUpdates: true
           replacesArtifacts: true
           prerelease: false
