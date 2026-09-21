@@ -334,7 +334,7 @@
   window.onload=function(){
     setTheme(getTheme());
     var meta=document.getElementById('meta');
-    if(meta) meta.innerText = name + (isMd?'  ·  Markdown' : (LANG_BY_EXT[ext]?('  ·  '+ext.toUpperCase()+' 代码'):'  ·  文本'));
+    if(meta) meta.innerText = name + (isMd?'  ·  Markdown' : ((LANG_BY_EXT[ext] && LANG_BY_EXT[ext]!=='_text')?('  ·  '+ext.toUpperCase()+' 代码'):'  ·  文本'));
     render();
     document.getElementById('editBtn').onclick=function(){
       if(this.value==='编辑') enterEdit(); else cancelEdit();
