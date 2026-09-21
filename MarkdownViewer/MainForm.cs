@@ -13,16 +13,19 @@ namespace MarkdownViewer
         private MainForm form;
         public ScriptBridge(MainForm f) { form = f; }
         public void SaveFile(string content) { form.SaveCurrentFile(content); }
+        public void SaveSettings(string json) { form.SaveSettings(json); }
     }
 
     public class MainForm : Form
     {
         private WebBrowser browser;
         private string currentFile;
+        private string settingsJson = "";
 
         public MainForm(string file)
         {
             currentFile = file;
+            settingsJson = LoadSettings();
             this.Text = "文件查看器";
             this.Width = 980;
             this.Height = 740;
@@ -48,6 +51,39 @@ namespace MarkdownViewer
             this.Controls.Add(browser);
 
             LoadFile(currentFile);
+        }
+
+        public void SaveSettings(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return;
+            try
+            {
+                string p = SettingsPath();
+                string dir = Path.GetDirectoryName(p);
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                File.WriteAllText(p, json ?? "", Encoding.UTF8);
+                settingsJson = json; // 让本次会话内打开新文件也沿用上次配色
+            }
+            catch { }
+        }
+
+        private string SettingsPath()
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "MarkdownViewer");
+            return Path.Combine(dir, "settings.json");
+        }
+
+        private string LoadSettings()
+        {
+            try
+            {
+                string p = SettingsPath();
+                if (File.Exists(p)) return File.ReadAllText(p, Encoding.UTF8);
+            }
+            catch { }
+            return "";
         }
 
         public void SaveCurrentFile(string content)
@@ -113,7 +149,8 @@ namespace MarkdownViewer
             string html = LoadTemplate()
                 .Replace("__B64__", b64)
                 .Replace("__EXTB64__", eb64)
-                .Replace("__NAMEB64__", nb64);
+                .Replace("__NAMEB64__", nb64)
+                .Replace("__SETSB64__", Convert.ToBase64String(Encoding.UTF8.GetBytes(settingsJson ?? "")));
             browser.DocumentText = html;
         }
 

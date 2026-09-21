@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="sepia">
+<html lang="zh-CN" data-theme="sea">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -53,77 +53,34 @@
   #empty{max-width:860px;margin:14vh auto;text-align:center;color:#8a7c5f}
   #empty h1{font-size:20px;font-weight:600}
 
-  /* ===== 护眼（默认，暖色纸面） ===== */
-  html[data-theme="sepia"] body{background:#f7f0e1;color:#4b4334}
-  html[data-theme="sepia"] #bar{background:#efe6d2;border-color:#e0d3b6}
-  html[data-theme="sepia"] #bar .btn{background:#f7f0e1;border-color:#d8c9a8;color:#5b513c}
-  html[data-theme="sepia"] #bar .meta{color:#8a7c5f}
-  html[data-theme="sepia"] .md a{color:#9a5b2f}
-  html[data-theme="sepia"] .md code,html[data-theme="sepia"] .md pre{background:#ece2cc}
-  html[data-theme="sepia"] .md pre,html[data-theme="sepia"] .md h1,html[data-theme="sepia"] .md h2{border-color:#e0d3b6}
-  html[data-theme="sepia"] .md blockquote{border-color:#d8c9a8;color:#7a6f57}
-  html[data-theme="sepia"] .md th,html[data-theme="sepia"] .md td{border-color:#e0d3b6}
-  html[data-theme="sepia"] .md hr{border-color:#e0d3b6}
-  html[data-theme="sepia"] .md kbd{background:#ece2cc;border-color:#d8c9a8}
-  html[data-theme="sepia"] #edit{background:#f7f0e1;color:#4b4334}
-  html[data-theme="sepia"] .codebox .code{background:#f1e8d4}
-  html[data-theme="sepia"] .codebox .gutter{background:#ece2cc;border-color:#e0d3b6;color:#b0a283}
-  html[data-theme="sepia"] #empty{color:#8a7c5f}
-  html[data-theme="sepia"] .str{color:#2f7d4f}
-  html[data-theme="sepia"] .cmt{color:#9a8c6a}
-  html[data-theme="sepia"] .kw{color:#9a3b1e}
-  html[data-theme="sepia"] .num{color:#b5651d}
-  html[data-theme="sepia"] .tag{color:#2a6f97}
-
-  /* ===== 日间 ===== */
-  html[data-theme="light"] body{background:#ffffff;color:#24292f}
-  html[data-theme="light"] #bar{background:#f6f8fa;border-color:#d0d7de}
-  html[data-theme="light"] #bar .btn{background:#fff;border-color:#d0d7de;color:#24292f}
-  html[data-theme="light"] #bar .meta{color:#57606a}
-  html[data-theme="light"] .md a{color:#0969da}
-  html[data-theme="light"] .codebox .code{background:#f6f8fa}
-  html[data-theme="light"] .codebox .gutter{background:#eef1f4;border-color:#d0d7de;color:#8c959f}
-  html[data-theme="light"] #edit{background:#fff;color:#24292f}
-  html[data-theme="light"] #empty{color:#57606a}
-  html[data-theme="light"] .str{color:#0a7d2c}
-  html[data-theme="light"] .cmt{color:#6e7781}
-  html[data-theme="light"] .kw{color:#0550ae}
-  html[data-theme="light"] .num{color:#953800}
-  html[data-theme="light"] .tag{color:#116329}
-
-  /* ===== 夜间 ===== */
-  html[data-theme="dark"] body{background:#1e2124;color:#d6dbe0}
-  html[data-theme="dark"] #bar{background:#26292d;border-color:#33383d}
-  html[data-theme="dark"] #bar .btn{background:#2f343a;border-color:#3a4047;color:#cfd6dd}
-  html[data-theme="dark"] #bar .meta{color:#8b949e}
-  html[data-theme="dark"] .md a{color:#58a6ff}
-  html[data-theme="dark"] .md code,html[data-theme="dark"] .md pre{background:#272b30}
-  html[data-theme="dark"] .md pre,html[data-theme="dark"] .md h1,html[data-theme="dark"] .md h2{border-color:#353b42}
-  html[data-theme="dark"] .md blockquote{border-color:#353b42;color:#9aa4ad}
-  html[data-theme="dark"] .md th,html[data-theme="dark"] .md td{border-color:#353b42}
-  html[data-theme="dark"] .md hr{border-color:#353b42}
-  html[data-theme="dark"] .md kbd{background:#272b30;border-color:#3a4047}
-  html[data-theme="dark"] .codebox .code{background:#272b30}
-  html[data-theme="dark"] .codebox .gutter{background:#22262a;border-color:#353b42;color:#6b7480}
-  html[data-theme="dark"] #edit{background:#1e2124;color:#d6dbe0}
-  html[data-theme="dark"] #empty{color:#8b949e}
-  html[data-theme="dark"] .str{color:#7ee787}
-  html[data-theme="dark"] .cmt{color:#8b949e}
-  html[data-theme="dark"] .kw{color:#79c0ff}
-  html[data-theme="dark"] .num{color:#f0883e}
-  html[data-theme="dark"] .tag{color:#7ee787}
+  /* 主题配色由 JS 在运行时注入（PALETTES），支持预设与自定义，默认浅蓝护眼 */
 </style>
 </head>
 <body>
 <div id="bar">
   <button class="btn" id="editBtn">编辑</button>
   <button class="btn" id="saveBtn" disabled>保存</button>
-  <button class="btn" id="themeBtn">主题</button>
+  <button class="btn" id="themeBtn">配色</button>
   <span class="meta" id="meta"></span>
   <span class="status" id="status"></span>
 </div>
 <div id="view"></div>
 <textarea id="edit" spellcheck="false"></textarea>
+  <div id="palette" style="display:none;position:fixed;top:46px;right:12px;z-index:30;background:#fff;border:1px solid #ccc;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:12px;width:248px;font-size:13px;color:#333">
+    <div style="font-weight:600;margin-bottom:8px">阅读配色（点击色块切换）</div>
+    <div id="swatches" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+    <div style="border-top:1px solid #eee;padding-top:10px">自定义颜色</div>
+    <div style="margin-top:8px;line-height:2">
+      背景 <input id="customBg" type="text" value="#DCE2F1" style="width:84px;border:1px solid #ccc;border-radius:4px;padding:2px 4px;font-family:Consolas,monospace">
+      文字 <input id="customFg" type="text" value="#2F3A45" style="width:84px;border:1px solid #ccc;border-radius:4px;padding:2px 4px;font-family:Consolas,monospace">
+    </div>
+    <div style="margin-top:8px">
+      <span id="customPreview" style="display:inline-block;width:22px;height:22px;border:1px solid #ccc;vertical-align:middle;border-radius:4px"></span>
+      <button class="btn" id="applyCustom" style="margin-left:8px">应用</button>
+      <button class="btn" id="closePalette" style="margin-left:4px">关闭</button>
+    </div>
+    <div id="customMsg" style="margin-top:6px;color:#c33;min-height:14px"></div>
+  </div>
 
 <script>/**
  * marked - a markdown parser
@@ -138,6 +95,7 @@
   var B64 = "__B64__";
   var EXTB64 = "__EXTB64__";
   var NAMEB64 = "__NAMEB64__";
+  var SETSB64 = "__SETSB64__";
   function deb64(s){ try{ return decodeURIComponent(escape(window.atob(s))); }catch(e){ return ""; } }
   var content = B64 ? deb64(B64) : "";
   var ext = EXTB64 ? deb64(EXTB64).toLowerCase() : "";
@@ -263,16 +221,94 @@
     return out;
   }
 
-  /* ===== 主题 ===== */
-  var THEMES=['sepia','light','dark'];
-  var THEME_NAME={sepia:'护眼',light:'日间',dark:'夜间'};
-  function getTheme(){ try{ return localStorage.getItem('mdv_theme')||'sepia'; }catch(e){ return 'sepia'; } }
-  function setTheme(t){
-    try{ localStorage.setItem('mdv_theme',t); }catch(e){}
-    document.documentElement.setAttribute('data-theme',t);
-    var b=document.getElementById('themeBtn'); if(b) b.value='主题：'+THEME_NAME[t];
+  /* ===== 主题（预设 + 自定义，运行时注入样式，记忆上次选择） ===== */
+  var PALETTES = {
+    sea:     {name:'海天蓝',  bg:'#DCE2F1', fg:'#2F3A45', bar:'#CFD8E8', border:'#B9C4DC', code:'#D2DAEC', gutter:'#CAD3E6', muted:'#5B6678', link:'#2A5C9A', str:'#2f7d4f', cmt:'#7E879A', kw:'#9A3B1E', num:'#B5651D', tag:'#2A6F97'},
+    gray:    {name:'极光灰',  bg:'#EAEAEF', fg:'#2E2E32', bar:'#DEDEE4', border:'#C9C9D1', code:'#E0E0E7', gutter:'#D8D8E0', muted:'#6B6B73', link:'#1F6FB2', str:'#2f7d4f', cmt:'#8B8B95', kw:'#B0451F', num:'#A85D12', tag:'#2A6F97'},
+    bluegray:{name:'蓝调浅灰',bg:'#EDEFF2', fg:'#2E3440', bar:'#E1E4EA', border:'#CDD2DB', code:'#E4E7ED', gutter:'#DCE0E7', muted:'#5E6675', link:'#2A5C9A', str:'#2f7d4f', cmt:'#828B99', kw:'#9A3B1E', num:'#B5651D', tag:'#2A6F97'},
+    green:   {name:'绿豆沙',  bg:'#C7EDCC', fg:'#264A30', bar:'#B9E2BF', border:'#A3D4AB', code:'#BCE3C2', gutter:'#B2DDB8', muted:'#4E6B57', link:'#1E7A3A', str:'#2f7d4f', cmt:'#6E8A78', kw:'#9A3B1E', num:'#B5651D', tag:'#2A6F97'},
+    grass:   {name:'青草绿',  bg:'#E3EDCD', fg:'#33402A', bar:'#D6E2BC', border:'#C2D2A3', code:'#DAE3C6', gutter:'#CFDBB4', muted:'#5C6A4E', link:'#3F6B2F', str:'#2f7d4f', cmt:'#7A8A66', kw:'#9A3B1E', num:'#B5651D', tag:'#2A6F97'},
+    purple:  {name:'葛巾紫',  bg:'#E9EBFE', fg:'#33304F', bar:'#DCDFF4', border:'#C7CBEA', code:'#DDDFF4', gutter:'#D3D7EF', muted:'#5E5B80', link:'#4A3FA0', str:'#2f7d4f', cmt:'#807D9C', kw:'#7A2E6E', num:'#B5651D', tag:'#2A6F97'},
+    warm:    {name:'暖白',    bg:'#FAF9F6', fg:'#2E2E2E', bar:'#F0EEE8', border:'#E0DDD4', code:'#F1EFE9', gutter:'#ECEAE3', muted:'#6E6B63', link:'#0969DA', str:'#0a7d2c', cmt:'#8a8a80', kw:'#9A3B1E', num:'#953800', tag:'#116329'},
+    white:   {name:'纯白',    bg:'#FFFFFF', fg:'#24292F', bar:'#F6F8FA', border:'#D0D7DE', code:'#F6F8FA', gutter:'#EEF1F4', muted:'#57606A', link:'#0969DA', str:'#0a7d2c', cmt:'#6E7781', kw:'#0550AE', num:'#953800', tag:'#116329'},
+    night:   {name:'夜间',    bg:'#1E2124', fg:'#D6DBE0', bar:'#26292D', border:'#353B42', code:'#272B30', gutter:'#22262A', muted:'#8B949E', link:'#58A6FF', str:'#7EE787', cmt:'#8B949E', kw:'#79C0FF', num:'#F0883E', tag:'#7EE787'}
+  };
+  var THEME_ORDER = ['sea','gray','bluegray','green','grass','purple','warm','white','night'];
+  var DEFAULT_THEME = 'sea';
+
+  function buildCSS(key,p){
+    function r(sel,decl){ return 'html[data-theme="'+key+'"] '+sel+'{'+decl+'}'; }
+    return [r('body','background:'+p.bg+';color:'+p.fg),
+      r('#bar','background:'+p.bar+';border-color:'+p.border),
+      r('#bar .btn','background:'+p.bg+';border-color:'+p.border+';color:'+p.fg),
+      r('#bar .meta','color:'+p.muted),
+      r('.md a','color:'+p.link),
+      r('.md code,.md pre','background:'+p.code),
+      r('.md pre,.md h1,.md h2','border-color:'+p.border),
+      r('.md blockquote','border-color:'+p.border+';color:'+p.muted),
+      r('.md th,.md td','border-color:'+p.border),
+      r('.md hr','border-color:'+p.border),
+      r('.md kbd','background:'+p.code+';border-color:'+p.border),
+      r('#edit','background:'+p.bg+';color:'+p.fg),
+      r('.codebox .code','background:'+p.code),
+      r('.codebox .gutter','background:'+p.gutter+';border-color:'+p.border+';color:'+p.muted),
+      r('#empty','color:'+p.muted),
+      r('.str','color:'+p.str), r('.cmt','color:'+p.cmt), r('.kw','color:'+p.kw), r('.num','color:'+p.num), r('.tag','color:'+p.tag)
+    ].join('');
   }
-  function cycleTheme(){ var i=THEMES.indexOf(getTheme()); if(i<0)i=0; setTheme(THEMES[(i+1)%THEMES.length]); }
+  function injectThemes(){
+    var css='';
+    for(var i=0;i<THEME_ORDER.length;i++){ css += buildCSS(THEME_ORDER[i], PALETTES[THEME_ORDER[i]]); }
+    var st=document.getElementById('themes');
+    if(!st){ st=document.createElement('style'); st.id='themes'; document.getElementsByTagName('head')[0].appendChild(st); }
+    st.textContent = css;
+  }
+  function hexToRgb(h){ h=h.replace('#',''); if(h.length===3) h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2]; return [parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)]; }
+  function rgbToHex(a){ return '#'+a.map(function(x){ var v=Math.max(0,Math.min(255,Math.round(x))).toString(16); return v.length<2?'0'+v:v; }).join(''); }
+  function mix(a,b,t){ var A=hexToRgb(a),B=hexToRgb(b); return rgbToHex([A[0]+(B[0]-A[0])*t,A[1]+(B[1]-A[1])*t,A[2]+(B[2]-A[2])*t]); }
+  function isDark(h){ var c=hexToRgb(h); return (0.299*c[0]+0.587*c[1]+0.114*c[2])<140; }
+  function normHex(h){ if(!h) return ''; h=String(h).trim(); if(h[0]!=='#') h='#'+h; if(/^#[0-9a-fA-F]{3}$/.test(h)){ h='#'+h[1]+h[1]+h[2]+h[2]+h[3]+h[3]; } if(/^#[0-9a-fA-F]{6}$/.test(h)) return h.toLowerCase(); return ''; }
+  function derivePalette(bg,fg){
+    var dark=isDark(bg); var muted=mix(fg,bg,0.5);
+    return {name:'自定义', bg:bg, fg:fg, bar:mix(bg,fg,0.06), border:mix(bg,fg,0.18),
+      code: dark?mix(bg,'#ffffff',0.08):mix(bg,'#000000',0.05),
+      gutter: dark?mix(bg,'#ffffff',0.06):mix(bg,'#000000',0.035),
+      muted:muted, link: dark?'#58a6ff':'#0969da',
+      str: dark?'#7ee787':'#2f7d4f', cmt:muted, kw: dark?'#79c0ff':'#9A3B1E',
+      num: dark?'#f0883e':'#B5651D', tag: dark?'#7ee787':'#2A6F97'};
+  }
+  function setAttr(key){ document.documentElement.setAttribute('data-theme',key); }
+  function persist(o){ try{ if(window.external && window.external.saveSettings){ window.external.saveSettings(JSON.stringify(o)); } }catch(e){} }
+  function markActive(key){
+    var box=document.getElementById('swatches'); if(!box) return;
+    var nodes=box.childNodes;
+    for(var i=0;i<nodes.length;i++){ var n=nodes[i]; if(n.getAttribute && n.getAttribute('data-key')){ var on=(n.getAttribute('data-key')===key); n.style.outline = on?'2px solid #0969da':'none'; n.style.outlineOffset='1px'; } }
+  }
+  function setTheme(key){
+    if(!PALETTES[key]) key=DEFAULT_THEME;
+    setAttr(key); persist({mode:'preset', key:key}); markActive(key);
+    var b=document.getElementById('themeBtn'); if(b) b.innerText='配色：'+PALETTES[key].name;
+  }
+  function applyCustom(bg,fg){
+    bg=normHex(bg); fg=normHex(fg);
+    if(!bg||!fg) return false;
+    var p=derivePalette(bg,fg);
+    var css=buildCSS('custom',p);
+    var st=document.getElementById('customTheme');
+    if(!st){ st=document.createElement('style'); st.id='customTheme'; document.getElementsByTagName('head')[0].appendChild(st); }
+    st.textContent=css; setAttr('custom'); persist({mode:'custom', bg:bg, fg:fg}); markActive('custom');
+    var b=document.getElementById('themeBtn'); if(b) b.innerText='配色：自定义';
+    return true;
+  }
+  function cycleTheme(){ var i=THEME_ORDER.indexOf(document.documentElement.getAttribute('data-theme')); if(i<0)i=0; setTheme(THEME_ORDER[(i+1)%THEME_ORDER.length]); }
+  function buildSwatches(){
+    var box=document.getElementById('swatches'); if(!box) return;
+    for(var i=0;i<THEME_ORDER.length;i++){ (function(k){ var p=PALETTES[k]; var el=document.createElement('div'); el.setAttribute('data-key',k); el.title=p.name; el.style.cssText='width:46px;height:34px;border-radius:6px;border:1px solid #bbb;cursor:pointer;position:relative;overflow:hidden'; el.innerHTML='<div style="position:absolute;inset:0;background:'+p.bg+'"></div><div style="position:absolute;left:5px;bottom:1px;font-size:10px;line-height:1.2;color:'+p.fg+';text-shadow:0 0 2px '+p.bg+'">'+p.name+'</div>'; el.onclick=function(){ setTheme(k); }; box.appendChild(el); })(THEME_ORDER[i]); }
+  }
+  function initTheme(s){
+    if(s && s.mode==='custom' && s.bg && s.fg){ applyCustom(s.bg, s.fg); }
+    else { setTheme(s && s.key && PALETTES[s.key] ? s.key : DEFAULT_THEME); }
+  }
 
   /* ===== 渲染 ===== */
   function render(){
@@ -332,7 +368,10 @@
   }
 
   window.onload=function(){
-    setTheme(getTheme());
+    var raw = (typeof SETSB64!=='undefined' && SETSB64) ? deb64(SETSB64) : '';
+    var settings = {};
+    try{ if(raw) settings = JSON.parse(raw); }catch(e){ settings={}; }
+    initTheme(settings);
     var meta=document.getElementById('meta');
     if(meta) meta.innerText = name + (isMd?'  ·  Markdown' : ((LANG_BY_EXT[ext] && LANG_BY_EXT[ext]!=='_text')?('  ·  '+ext.toUpperCase()+' 代码'):'  ·  文本'));
     render();
@@ -340,7 +379,21 @@
       if(this.value==='编辑') enterEdit(); else cancelEdit();
     };
     document.getElementById('saveBtn').onclick=save;
-    document.getElementById('themeBtn').onclick=cycleTheme;
+    var themeBtn=document.getElementById('themeBtn');
+    if(themeBtn) themeBtn.onclick=function(){ var p=document.getElementById('palette'); p.style.display = (p.style.display==='block')?'none':'block'; };
+    var closeP=document.getElementById('closePalette'); if(closeP) closeP.onclick=function(){ document.getElementById('palette').style.display='none'; };
+    var applyC=document.getElementById('applyCustom');
+    if(applyC) applyC.onclick=function(){
+      var bg=document.getElementById('customBg').value, fg=document.getElementById('customFg').value;
+      var msg=document.getElementById('customMsg');
+      if(!normHex(bg)||!normHex(fg)){ if(msg) msg.innerText='请输入 6 位十六进制颜色，如 #DCE2F1'; return; }
+      if(msg) msg.innerText='';
+      applyCustom(bg,fg);
+      var pv=document.getElementById('customPreview'); if(pv) pv.style.background=normHex(bg);
+    };
+    var bgInput=document.getElementById('customBg'), fgInput=document.getElementById('customFg');
+    function livePreview(){ var pv=document.getElementById('customPreview'); if(!pv) return; var b=normHex(bgInput.value); if(b) pv.style.background=b; }
+    if(bgInput) bgInput.onkeyup=livePreview; if(fgInput) fgInput.onkeyup=livePreview;
     var ta=document.getElementById('edit');
     ta.onkeydown=function(e){
       if((e.ctrlKey||e.metaKey) && (e.key==='s'||e.keyCode===83)){ e.preventDefault(); save(); }
@@ -348,6 +401,8 @@
   };
 
   window.cycleTheme=cycleTheme;
+  injectThemes();
+  buildSwatches();
 })();
 </script>
 </body>
