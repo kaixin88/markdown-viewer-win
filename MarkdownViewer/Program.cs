@@ -25,10 +25,12 @@ namespace MarkdownViewer
             {
                 foreach (var a in args)
                 {
-                    if (a.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
-                        a.EndsWith(".markdown", StringComparison.OrdinalIgnoreCase) ||
-                        a.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
-                    { file = a; break; }
+                    if (string.IsNullOrEmpty(a) || a.StartsWith("-")) continue;
+                    if (System.IO.File.Exists(a))
+                    {
+                        file = a;
+                        break;
+                    }
                 }
             }
 

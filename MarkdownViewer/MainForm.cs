@@ -6,6 +6,15 @@ using System.Windows.Forms;
 
 namespace MarkdownViewer
 {
+    // 供页面 JS 通过 window.external 调用，用于把编辑后的内容写回文件
+    [System.Runtime.InteropServices.ComVisible(true)]
+    public class ScriptBridge
+    {
+        private MainForm form;
+        public ScriptBridge(MainForm f) { form = f; }
+        public void SaveFile(string content) { form.SaveCurrentFile(content); }
+    }
+
     public class MainForm : Form
     {
         private WebBrowser browser;
@@ -14,9 +23,9 @@ namespace MarkdownViewer
         public MainForm(string file)
         {
             currentFile = file;
-            this.Text = "Markdown 查看器";
-            this.Width = 920;
-            this.Height = 720;
+            this.Text = "文件查看器";
+            this.Width = 980;
+            this.Height = 740;
 
             var menu = new MenuStrip();
             menu.Dock = DockStyle.Top;
@@ -33,20 +42,36 @@ namespace MarkdownViewer
             browser = new WebBrowser();
             browser.Dock = DockStyle.Fill;
             browser.ScriptErrorsSuppressed = true;
+            browser.AllowNavigation = false;       // 查看器不跳转页面
+            browser.AllowWebBrowserDrop = false;
+            browser.ObjectForScripting = new ScriptBridge(this);
             this.Controls.Add(browser);
 
-            LoadMarkdown(currentFile);
+            LoadFile(currentFile);
+        }
+
+        public void SaveCurrentFile(string content)
+        {
+            if (string.IsNullOrEmpty(currentFile)) return;
+            try
+            {
+                File.WriteAllText(currentFile, content ?? "", Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("保存失败：" + ex.Message, "保存", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         private void OpenFile()
         {
             using (var dlg = new OpenFileDialog())
             {
-                dlg.Filter = "Markdown 文件|*.md;*.markdown;*.txt|所有文件|*.*";
+                dlg.Filter = "全部支持|*.md;*.markdown;*.txt;*.text;*.log;*.sql;*.py;*.js;*.ts;*.cs;*.java;*.c;*.cpp;*.h;*.go;*.rs;*.sh;*.json;*.yaml;*.yml;*.xml;*.html;*.htm;*.css;*.ini;*.conf;*.php;*.rb;*.ps1|Markdown|*.md;*.markdown|代码文件|*.txt;*.sql;*.py;*.js;*.ts;*.cs;*.java;*.c;*.cpp;*.h;*.go;*.rs;*.sh;*.json;*.yaml;*.yml;*.xml;*.html;*.htm;*.css;*.ini;*.conf;*.php;*.rb;*.ps1|所有文件|*.*";
                 if (dlg.ShowDialog() == DialogResult.OK)
                 {
                     currentFile = dlg.FileName;
-                    LoadMarkdown(currentFile);
+                    LoadFile(currentFile);
                 }
             }
         }
@@ -56,31 +81,39 @@ namespace MarkdownViewer
             try
             {
                 if (browser.Document != null)
-                {
-                    browser.Document.InvokeScript("eval",
-                        new object[] { "var d=document.documentElement; d.setAttribute('data-theme', d.getAttribute('data-theme')==='dark'?'light':'dark');" });
-                }
+                    browser.Document.InvokeScript("cycleTheme");
             }
             catch { }
         }
 
-        private void LoadMarkdown(string path)
+        private void LoadFile(string path)
         {
-            string md = "";
+            string text = "";
+            string ext = "";
+            string name = "未命名";
             if (!string.IsNullOrEmpty(path))
             {
                 if (File.Exists(path))
                 {
-                    md = File.ReadAllText(path, Encoding.UTF8);
-                    this.Text = "Markdown 查看器 — " + Path.GetFileName(path);
+                    text = File.ReadAllText(path, Encoding.UTF8);
+                    ext = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
+                    name = Path.GetFileName(path);
+                    this.Text = "文件查看器 — " + name;
                 }
                 else
                 {
-                    md = "# 无法读取文件\n\n路径：" + path;
+                    text = "# 无法读取文件\n\n路径：" + path;
+                    ext = "md";
+                    name = Path.GetFileName(path);
                 }
             }
-            string b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(md ?? ""));
-            string html = LoadTemplate().Replace("__B64__", b64);
+            string b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(text ?? ""));
+            string eb64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(ext ?? ""));
+            string nb64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(name ?? ""));
+            string html = LoadTemplate()
+                .Replace("__B64__", b64)
+                .Replace("__EXTB64__", eb64)
+                .Replace("__NAMEB64__", nb64);
             browser.DocumentText = html;
         }
 
