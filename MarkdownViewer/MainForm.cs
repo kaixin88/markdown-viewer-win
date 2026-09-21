@@ -90,7 +90,7 @@ namespace MarkdownViewer
                 .GetManifestResourceStream("MarkdownViewer.viewer.html"))
             {
                 using (var r = new StreamReader(s))
-                    return r.ReadAllText();
+                    return r.ReadToEnd();
             }
         }
     }
