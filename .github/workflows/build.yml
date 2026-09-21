@@ -23,6 +23,7 @@ jobs:
             $msbuild = & $vswhere -latest -find "MSBuild\**\Bin\MSBuild.exe"
           }
           Write-Host "MSBuild: $msbuild"
+          & $msbuild "${{ github.workspace }}\MarkdownViewer\MarkdownViewer.csproj" /t:Restore
           & $msbuild "${{ github.workspace }}\MarkdownViewer\MarkdownViewer.csproj" /p:Configuration=Release
 
       - name: Upload artifact
