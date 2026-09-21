@@ -3,6 +3,7 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace MarkdownViewer
 {
@@ -24,6 +25,7 @@ namespace MarkdownViewer
 
         public MainForm(string file)
         {
+            SetBrowserEmulation();
             currentFile = file;
             settingsJson = LoadSettings();
             this.Text = "文件查看器";
@@ -51,6 +53,20 @@ namespace MarkdownViewer
             this.Controls.Add(browser);
 
             LoadFile(currentFile);
+        }
+
+
+        private void SetBrowserEmulation()
+        {
+            try
+            {
+                using (var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION"))
+                {
+                    string exeName = Path.GetFileName(Application.ExecutablePath);
+                    key.SetValue(exeName, 11001, RegistryValueKind.DWord);
+                }
+            }
+            catch { }
         }
 
         public void SaveSettings(string json)

@@ -4,20 +4,21 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <title>文件查看器</title>
-<style>
-  *{box-sizing:border-box}
+<style>*{box-sizing:border-box}
+  html{background:#DCE2F1}
   html,body{margin:0;height:100%}
-  body{font-family:"Segoe UI","Microsoft YaHei","PingFang SC",Helvetica,Arial,sans-serif;font-size:15px;line-height:1.7}
+  body{font-family:"Segoe UI","Microsoft YaHei UI","PingFang SC","Hiragino Sans GB","Noto Sans CJK SC",sans-serif;font-size:16px;line-height:1.75;-ms-text-size-adjust:100%;background:#DCE2F1;color:#1E293B}
 
-  /* ===== 顶部工具栏 ===== */
-  #bar{position:fixed;top:0;left:0;right:0;height:46px;z-index:10;border-bottom:1px solid #ddd;padding:7px 12px}
-  #bar .btn{font:inherit;font-size:13px;padding:5px 12px;margin-right:6px;border:1px solid #ccc;border-radius:6px;background:#fff;color:#333;cursor:pointer}
+  /* ===== 顶部工具栏（文件路径与按钮同一排） ===== */
+  #bar{position:fixed;top:0;left:0;right:0;height:46px;z-index:10;border-bottom:1px solid #B9C4DC;padding:7px 12px;overflow:hidden;background:#CFD8E8}
+  #bar .meta{float:left;line-height:32px;font-size:13px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;color:#4A5568}
+  #bar .right{float:right;white-space:nowrap}
+  #bar .btn{font:inherit;font-size:13px;padding:5px 12px;margin-left:6px;border:1px solid #B9C4DC;border-radius:6px;background:#DCE2F1;color:#1E293B;cursor:pointer}
   #bar .btn:disabled{opacity:.45;cursor:default}
-  #bar .meta{float:right;color:#888;font-size:12px;line-height:32px;margin-right:4px}
-  #bar .status{margin-left:10px;color:#2a8;opacity:0;transition:opacity .3s}
+  #bar .status{display:inline-block;margin-left:10px;line-height:32px;opacity:0;transition:opacity .3s;color:#2a8}
 
   #view{margin-top:46px;padding:22px 22px 90px;max-width:1000px}
-  #edit{display:none;margin-top:46px;width:100%;height:calc(100% - 46px);border:0;resize:none;padding:18px 22px;font-family:Consolas,"Courier New",monospace;font-size:14px;line-height:1.6;outline:none}
+  #edit{display:none;margin-top:46px;width:100%;height:calc(100% - 46px);border:0;resize:none;padding:18px 22px;font-family:Consolas,"Lucida Console","Courier New","Microsoft YaHei",monospace;font-size:14.5px;line-height:1.75;outline:none}
 
   /* ===== Markdown 排版 ===== */
   .md h1,.md h2,.md h3,.md h4{margin:24px 0 16px;font-weight:600;line-height:1.3}
@@ -27,62 +28,67 @@
   .md p{margin:0 0 16px}
   .md a{text-decoration:none}
   .md a:hover{text-decoration:underline}
-  .md code{background:#f3f3f3;border-radius:6px;padding:.2em .4em;font-size:85%;font-family:Consolas,monospace}
-  .md pre{background:#f3f3f3;border-radius:6px;padding:16px;overflow:auto}
-  .md pre code{background:none;padding:0;font-size:85%}
-  .md blockquote{margin:0 0 16px;padding:0 1em;color:#57606a;border-left:4px solid #ddd}
+  .md code{border-radius:5px;padding:.2em .45em;font-size:86%;font-family:Consolas,"Lucida Console",monospace}
+  .md pre{border-radius:8px;padding:16px;overflow:auto;border:1px solid}
+  .md pre code{background:none;padding:0;font-size:92%}
+  .md blockquote{margin:0 0 16px;padding:0 1em;border-left:4px solid #ddd}
   .md table{border-collapse:collapse;margin:0 0 16px}
   .md th,.md td{border:1px solid #ddd;padding:6px 13px}
   .md img{max-width:100%}
   .md hr{border:0;border-top:1px solid #ddd;margin:24px 0}
   .md ul,.md ol{padding-left:2em;margin:0 0 16px}
-  .md kbd{background:#f3f3f3;border:1px solid #ccc;border-radius:4px;padding:1px 6px;font-size:12px}
+  .md kbd{border:1px solid #ccc;border-radius:4px;padding:1px 6px;font-size:12px}
 
-  /* ===== 代码视图 ===== */
+  /* ===== 代码/文本视图 ===== */
   .codebox{border-collapse:collapse;width:100%}
   .codebox td{padding:0;vertical-align:top}
-  .gutter{padding:14px 10px 14px 14px;text-align:right;color:#aaa;-ms-user-select:none;user-select:none;white-space:pre;font-family:Consolas,"Courier New",monospace;font-size:13px;line-height:1.6;border-right:1px solid}
-  .codebox .code{padding:14px 16px;white-space:pre;font-family:Consolas,"Courier New",monospace;font-size:13px;line-height:1.6;overflow:auto}
+  .gutter{padding:14px 10px 14px 14px;text-align:right;-ms-user-select:none;user-select:none;white-space:pre;font-family:Consolas,"Lucida Console",monospace;font-size:14px;line-height:1.75;border-right:1px solid}
+  .codebox .code{padding:14px 16px;white-space:pre;font-family:Consolas,"Lucida Console",monospace;font-size:14px;line-height:1.75;overflow:auto}
   .codebox .code pre{margin:0}
-  .str{color:#2f7d4f}
-  .cmt{color:#9a8c6a;font-style:italic}
-  .kw{color:#9a3b1e;font-weight:600}
-  .num{color:#b5651d}
-  .tag{color:#2a6f97}
+  .cmt{font-style:italic}
+  .kw{font-weight:600}
 
-  #empty{max-width:860px;margin:14vh auto;text-align:center;color:#8a7c5f}
+  #empty{max-width:860px;margin:14vh auto;text-align:center;color:#4A5568}
   #empty h1{font-size:20px;font-weight:600}
 
-  /* 主题配色由 JS 在运行时注入（PALETTES），支持预设与自定义，默认浅蓝护眼 */
+  /* ===== 配色面板 ===== */
+  #palette{display:none;position:fixed;top:46px;right:12px;z-index:30;border:1px solid;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:12px;width:248px;font-size:13px;background:#DCE2F1;color:#1E293B}
+  #palette .ptitle{font-weight:600;margin-bottom:8px}
+  #palette #swatches{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+  #palette .psec{border-top:1px solid #B9C4DC;padding-top:10px}
+  #palette .prow{margin-top:8px;line-height:2}
+  #palette input{width:84px;border:1px solid;border-radius:4px;padding:2px 4px;font-family:Consolas,monospace;background:#DCE2F1;color:#1E293B}
+  #palette #customPreview{display:inline-block;width:22px;height:22px;border:1px solid;vertical-align:middle;border-radius:4px}
+  #palette #customMsg{margin-top:6px;color:#c33;min-height:14px}
 </style>
 </head>
 <body>
 <div id="bar">
-  <button class="btn" id="editBtn">编辑</button>
-  <button class="btn" id="saveBtn" disabled>保存</button>
-  <button class="btn" id="themeBtn">配色</button>
   <span class="meta" id="meta"></span>
-  <span class="status" id="status"></span>
+  <span class="right">
+    <button class="btn" id="editBtn">编辑</button>
+    <button class="btn" id="saveBtn" disabled>保存</button>
+    <button class="btn" id="themeBtn">配色</button>
+    <span class="status" id="status"></span>
+  </span>
 </div>
 <div id="view"></div>
 <textarea id="edit" spellcheck="false"></textarea>
-  <div id="palette" style="display:none;position:fixed;top:46px;right:12px;z-index:30;background:#fff;border:1px solid #ccc;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:12px;width:248px;font-size:13px;color:#333">
-    <div style="font-weight:600;margin-bottom:8px">阅读配色（点击色块切换）</div>
-    <div id="swatches" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
-    <div style="border-top:1px solid #eee;padding-top:10px">自定义颜色</div>
-    <div style="margin-top:8px;line-height:2">
-      背景 <input id="customBg" type="text" value="#DCE2F1" style="width:84px;border:1px solid #ccc;border-radius:4px;padding:2px 4px;font-family:Consolas,monospace">
-      文字 <input id="customFg" type="text" value="#2F3A45" style="width:84px;border:1px solid #ccc;border-radius:4px;padding:2px 4px;font-family:Consolas,monospace">
-    </div>
-    <div style="margin-top:8px">
-      <span id="customPreview" style="display:inline-block;width:22px;height:22px;border:1px solid #ccc;vertical-align:middle;border-radius:4px"></span>
-      <button class="btn" id="applyCustom" style="margin-left:8px">应用</button>
-      <button class="btn" id="closePalette" style="margin-left:4px">关闭</button>
-    </div>
-    <div id="customMsg" style="margin-top:6px;color:#c33;min-height:14px"></div>
+<div id="palette">
+  <div class="ptitle">阅读配色（点击色块切换）</div>
+  <div id="swatches"></div>
+  <div class="psec">自定义颜色</div>
+  <div class="prow">
+    背景 <input id="customBg" type="text" value="#DCE2F1">
+    文字 <input id="customFg" type="text" value="#1E293B">
   </div>
-
-<script>/**
+  <div class="prow">
+    <span id="customPreview"></span>
+    <button class="btn" id="applyCustom">应用</button>
+    <button class="btn" id="closePalette">关闭</button>
+  </div>
+  <div id="customMsg"></div>
+</div><script>/**
  * marked - a markdown parser
  * Copyright (c) 2011-2014, Christopher Jeffrey. (MIT Licensed)
  * https://github.com/markedjs/marked
@@ -103,6 +109,7 @@
 
   var MD_EXT = {md:1, markdown:1};
   var isMd = !!MD_EXT[ext];
+  var D = '"', S = "'", DDD = D+D+D, SSS = S+S+S;
 
   var LANG_BY_EXT = {
     txt:"_text", text:"_text", log:"_text",
@@ -123,7 +130,7 @@
   };
 
   var KW = {
-    python:["def","class","return","if","elif","else","for","while","import","from","as","in","not","and","or","is","lambda","try","except","finally","with","raise","yield","global","nonlocal","pass","break","continue","print","True","False","None","self","async","await","del","assert","not"],
+    python:["def","class","return","if","elif","else","for","while","import","from","as","in","not","and","or","is","lambda","try","except","finally","with","raise","yield","global","nonlocal","pass","break","continue","print","True","False","None","self","async","await","del","assert"],
     sql:["SELECT","FROM","WHERE","INSERT","UPDATE","DELETE","CREATE","TABLE","ALTER","DROP","INDEX","VIEW","INTO","VALUES","SET","JOIN","LEFT","RIGHT","INNER","OUTER","FULL","ON","AND","OR","NOT","NULL","GROUP","BY","ORDER","HAVING","LIMIT","OFFSET","AS","DISTINCT","COUNT","SUM","AVG","MIN","MAX","CASE","WHEN","THEN","ELSE","END","UNION","ALL","PRIMARY","KEY","FOREIGN","REFERENCES","DEFAULT","CHECK","CONSTRAINT","UNIQUE","INT","INTEGER","VARCHAR","CHAR","TEXT","DATE","DATETIME","BOOLEAN","BIGINT","DECIMAL","FLOAT","DOUBLE","BEGIN","TRANSACTION","COMMIT","ROLLBACK","WITH"],
     js:["function","var","let","const","if","else","for","while","do","switch","case","break","continue","return","new","class","extends","super","this","typeof","instanceof","in","of","void","delete","yield","await","async","try","catch","finally","throw","import","export","from","default","null","true","false","undefined","NaN"],
     csharp:["using","namespace","class","struct","interface","public","private","protected","internal","static","void","var","string","int","double","float","bool","decimal","long","short","byte","char","object","if","else","for","foreach","while","do","switch","case","break","continue","return","new","this","base","typeof","sizeof","true","false","null","async","await","try","catch","finally","throw","get","set","partial","abstract","sealed","virtual","override","ref","out","in"],
@@ -137,7 +144,7 @@
     css:[],
     ini:[],
     php:["function","class","public","private","protected","static","var","echo","if","else","elseif","for","foreach","while","switch","case","break","return","new","this","null","true","false","use","namespace","try","catch","throw","require","include"],
-    ruby:["def","class","module","if","elsif","else","unless","for","while","do","end","return","def","puts","require","attr_accessor","nil","true","false","self","then"],
+    ruby:["def","class","module","if","elsif","else","unless","for","while","do","end","return","puts","require","attr_accessor","nil","true","false","self","then"],
     swift:["func","class","struct","enum","var","let","if","else","for","while","switch","case","return","init","self","nil","true","false","guard","import","protocol","extension"],
     powershell:["function","param","if","else","elseif","for","foreach","while","switch","return","Write-Host","Write-Output","Get-ChildItem","Set-Location","Import-Module","Export-ModuleMember","try","catch","finally","throw"]
   };
@@ -145,7 +152,7 @@
   function cfgFor(lang){
     var strings = ['"',"'","`"];
     var c = {strings:strings};
-    if(lang==="python"){ c.line="#"; c.strings=['"',"'",'"""',"'''"]; c.kw=KW.python; }
+    if(lang==="python"){ c.line="#"; c.strings=[D,S,DDD,SSS]; c.kw=KW.python; }
     else if(lang==="sql"){ c.line="--"; c.block=true; c.kw=KW.sql; }
     else if(lang==="js"){ c.line="//"; c.block=true; c.kw=KW.js; }
     else if(lang==="csharp"){ c.line="//"; c.block=true; c.kw=KW.csharp; }
@@ -163,7 +170,7 @@
     else if(lang==="ruby"){ c.line="#"; c.kw=KW.ruby; }
     else if(lang==="swift"){ c.line="//"; c.block=true; c.kw=KW.swift; }
     else if(lang==="powershell"){ c.line="#"; c.kw=KW.powershell; }
-    else { c = {strings:strings}; } /* _text: 仅字符串/少量 */
+    else { c = {strings:strings}; }
     return c;
   }
 
@@ -176,8 +183,8 @@
           if(d==='"') parts.push('"(?:[^"\\\\]|\\\\.)*"');
           else if(d==="'") parts.push("'(?:[^'\\\\]|\\\\.)*'");
           else if(d==="`") parts.push("`(?:[^`\\\\]|\\\\.)*`");
-        } else if(d==='"""') parts.push('"""[\\s\\S]*?"""');
-        else if(d==="'''") parts.push("'''[\\s\\S]*?'''");
+        } else if(d===DDD) parts.push(DDD+'[\\s\\S]*?'+DDD);
+        else if(d===SSS) parts.push(SSS+'[\\s\\S]*?'+SSS);
       }
     }
     if(c.line) parts.push(c.line.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+'[^\\n]*');
@@ -221,96 +228,198 @@
     return out;
   }
 
-  /* ===== 主题（预设 + 自定义，运行时注入样式，记忆上次选择） ===== */
+  /* ===== 主题（单 style 注入，记忆上次，支持自定义） ===== */
   var PALETTES = {
-    sea:     {name:'海天蓝',  bg:'#DCE2F1', fg:'#2F3A45', bar:'#CFD8E8', border:'#B9C4DC', code:'#D2DAEC', gutter:'#CAD3E6', muted:'#5B6678', link:'#2A5C9A', str:'#2f7d4f', cmt:'#7E879A', kw:'#9A3B1E', num:'#B5651D', tag:'#2A6F97'},
-    gray:    {name:'极光灰',  bg:'#EAEAEF', fg:'#2E2E32', bar:'#DEDEE4', border:'#C9C9D1', code:'#E0E0E7', gutter:'#D8D8E0', muted:'#6B6B73', link:'#1F6FB2', str:'#2f7d4f', cmt:'#8B8B95', kw:'#B0451F', num:'#A85D12', tag:'#2A6F97'},
-    bluegray:{name:'蓝调浅灰',bg:'#EDEFF2', fg:'#2E3440', bar:'#E1E4EA', border:'#CDD2DB', code:'#E4E7ED', gutter:'#DCE0E7', muted:'#5E6675', link:'#2A5C9A', str:'#2f7d4f', cmt:'#828B99', kw:'#9A3B1E', num:'#B5651D', tag:'#2A6F97'},
-    green:   {name:'绿豆沙',  bg:'#C7EDCC', fg:'#264A30', bar:'#B9E2BF', border:'#A3D4AB', code:'#BCE3C2', gutter:'#B2DDB8', muted:'#4E6B57', link:'#1E7A3A', str:'#2f7d4f', cmt:'#6E8A78', kw:'#9A3B1E', num:'#B5651D', tag:'#2A6F97'},
-    grass:   {name:'青草绿',  bg:'#E3EDCD', fg:'#33402A', bar:'#D6E2BC', border:'#C2D2A3', code:'#DAE3C6', gutter:'#CFDBB4', muted:'#5C6A4E', link:'#3F6B2F', str:'#2f7d4f', cmt:'#7A8A66', kw:'#9A3B1E', num:'#B5651D', tag:'#2A6F97'},
-    purple:  {name:'葛巾紫',  bg:'#E9EBFE', fg:'#33304F', bar:'#DCDFF4', border:'#C7CBEA', code:'#DDDFF4', gutter:'#D3D7EF', muted:'#5E5B80', link:'#4A3FA0', str:'#2f7d4f', cmt:'#807D9C', kw:'#7A2E6E', num:'#B5651D', tag:'#2A6F97'},
-    warm:    {name:'暖白',    bg:'#FAF9F6', fg:'#2E2E2E', bar:'#F0EEE8', border:'#E0DDD4', code:'#F1EFE9', gutter:'#ECEAE3', muted:'#6E6B63', link:'#0969DA', str:'#0a7d2c', cmt:'#8a8a80', kw:'#9A3B1E', num:'#953800', tag:'#116329'},
-    white:   {name:'纯白',    bg:'#FFFFFF', fg:'#24292F', bar:'#F6F8FA', border:'#D0D7DE', code:'#F6F8FA', gutter:'#EEF1F4', muted:'#57606A', link:'#0969DA', str:'#0a7d2c', cmt:'#6E7781', kw:'#0550AE', num:'#953800', tag:'#116329'},
-    night:   {name:'夜间',    bg:'#1E2124', fg:'#D6DBE0', bar:'#26292D', border:'#353B42', code:'#272B30', gutter:'#22262A', muted:'#8B949E', link:'#58A6FF', str:'#7EE787', cmt:'#8B949E', kw:'#79C0FF', num:'#F0883E', tag:'#7EE787'}
+    sea:     {name:'海天蓝',    bg:'#DCE2F1', fg:'#1E293B', bar:'#CFD8E8', border:'#B9C4DC', code:'#D2DAEC', gutter:'#CAD3E6', muted:'#4A5568', link:'#1E4E8C', str:'#1F6F3F', cmt:'#5C6B80', kw:'#7A2E10', num:'#8A4D10', tag:'#1A5A7A'},
+    gray:    {name:'极光灰',    bg:'#EAEAEF', fg:'#1F1F23', bar:'#DEDEE4', border:'#C9C9D1', code:'#E0E0E7', gutter:'#D8D8E0', muted:'#5A5A62', link:'#15579A', str:'#1F6F3F', cmt:'#6B6B78', kw:'#8F3812', num:'#7A4A0A', tag:'#1A5A7A'},
+    bluegray:{name:'蓝调浅灰',  bg:'#EDEFF2', fg:'#1F2937', bar:'#E1E4EA', border:'#CDD2DB', code:'#E4E7ED', gutter:'#DCE0E7', muted:'#4A5568', link:'#1E4E8C', str:'#1F6F3F', cmt:'#5C6B80', kw:'#7A2E10', num:'#8A4D10', tag:'#1A5A7A'},
+    green:   {name:'绿豆沙',    bg:'#C7EDCC', fg:'#153820', bar:'#B9E2BF', border:'#8FCB99', code:'#BCE3C2', gutter:'#B2DDB8', muted:'#3D5B47', link:'#1B6B36', str:'#1F6F3F', cmt:'#5A7A66', kw:'#7A2E10', num:'#8A4D10', tag:'#1A5A7A'},
+    grass:   {name:'青草绿',    bg:'#E3EDCD', fg:'#243018', bar:'#D6E2BC', border:'#B8C89B', code:'#DAE3C6', gutter:'#CFDBB4', muted:'#4E5C40', link:'#2F5F22', str:'#1F6F3F', cmt:'#5F6F52', kw:'#7A2E10', num:'#8A4D10', tag:'#1A5A7A'},
+    purple:  {name:'葛巾紫',    bg:'#E9EBFE', fg:'#222044', bar:'#DCDFF4', border:'#C0C5F0', code:'#DDDFF4', gutter:'#D3D7EF', muted:'#55527A', link:'#3F3590', str:'#1F6F3F', cmt:'#6F6C99', kw:'#6A205E', num:'#8A4D10', tag:'#1A5A7A'},
+    warm:    {name:'暖白',      bg:'#FAF9F6', fg:'#1A1A1A', bar:'#F0EEE8', border:'#DDDAD0', code:'#F1EFE9', gutter:'#ECEAE3', muted:'#5E5B52', link:'#0751B6', str:'#0A6B24', cmt:'#6A6A60', kw:'#8F3812', num:'#7A3A08', tag:'#0E5A26'},
+    white:   {name:'纯白',      bg:'#FFFFFF', fg:'#1F2328', bar:'#F6F8FA', border:'#D0D7DE', code:'#F6F8FA', gutter:'#EEF1F4', muted:'#4F5760', link:'#0969DA', str:'#0A6B24', cmt:'#5C656E', kw:'#0850C1', num:'#7A3A08', tag:'#0E5A26'},
+    night:   {name:'夜间',      bg:'#1E2124', fg:'#E6EAEF', bar:'#26292D', border:'#3A4048', code:'#272B30', gutter:'#22262A', muted:'#9BA5B0', link:'#79B8FF', str:'#7EE787', cmt:'#9BA5B0', kw:'#79C0FF', num:'#F0883E', tag:'#7EE787'}
   };
   var THEME_ORDER = ['sea','gray','bluegray','green','grass','purple','warm','white','night'];
   var DEFAULT_THEME = 'sea';
 
-  function buildCSS(key,p){
-    function r(sel,decl){ return 'html[data-theme="'+key+'"] '+sel+'{'+decl+'}'; }
-    return [r('body','background:'+p.bg+';color:'+p.fg),
-      r('#bar','background:'+p.bar+';border-color:'+p.border),
-      r('#bar .btn','background:'+p.bg+';border-color:'+p.border+';color:'+p.fg),
-      r('#bar .meta','color:'+p.muted),
-      r('.md a','color:'+p.link),
-      r('.md code,.md pre','background:'+p.code),
-      r('.md pre,.md h1,.md h2','border-color:'+p.border),
-      r('.md blockquote','border-color:'+p.border+';color:'+p.muted),
-      r('.md th,.md td','border-color:'+p.border),
-      r('.md hr','border-color:'+p.border),
-      r('.md kbd','background:'+p.code+';border-color:'+p.border),
-      r('#edit','background:'+p.bg+';color:'+p.fg),
-      r('.codebox .code','background:'+p.code),
-      r('.codebox .gutter','background:'+p.gutter+';border-color:'+p.border+';color:'+p.muted),
-      r('#empty','color:'+p.muted),
-      r('.str','color:'+p.str), r('.cmt','color:'+p.cmt), r('.kw','color:'+p.kw), r('.num','color:'+p.num), r('.tag','color:'+p.tag)
-    ].join('');
-  }
-  function injectThemes(){
-    var css='';
-    for(var i=0;i<THEME_ORDER.length;i++){ css += buildCSS(THEME_ORDER[i], PALETTES[THEME_ORDER[i]]); }
-    var st=document.getElementById('themes');
-    if(!st){ st=document.createElement('style'); st.id='themes'; document.getElementsByTagName('head')[0].appendChild(st); }
-    st.textContent = css;
-  }
   function hexToRgb(h){ h=h.replace('#',''); if(h.length===3) h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2]; return [parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)]; }
   function rgbToHex(a){ return '#'+a.map(function(x){ var v=Math.max(0,Math.min(255,Math.round(x))).toString(16); return v.length<2?'0'+v:v; }).join(''); }
   function mix(a,b,t){ var A=hexToRgb(a),B=hexToRgb(b); return rgbToHex([A[0]+(B[0]-A[0])*t,A[1]+(B[1]-A[1])*t,A[2]+(B[2]-A[2])*t]); }
   function isDark(h){ var c=hexToRgb(h); return (0.299*c[0]+0.587*c[1]+0.114*c[2])<140; }
   function normHex(h){ if(!h) return ''; h=String(h).trim(); if(h[0]!=='#') h='#'+h; if(/^#[0-9a-fA-F]{3}$/.test(h)){ h='#'+h[1]+h[1]+h[2]+h[2]+h[3]+h[3]; } if(/^#[0-9a-fA-F]{6}$/.test(h)) return h.toLowerCase(); return ''; }
+
   function derivePalette(bg,fg){
-    var dark=isDark(bg); var muted=mix(fg,bg,0.5);
-    return {name:'自定义', bg:bg, fg:fg, bar:mix(bg,fg,0.06), border:mix(bg,fg,0.18),
+    var dark=isDark(bg);
+    var muted=mix(fg,bg,0.45);
+    var p = {
+      name:'自定义', bg:bg, fg:fg,
+      bar:mix(bg,fg,0.06), border:mix(fg,bg,0.28),
       code: dark?mix(bg,'#ffffff',0.08):mix(bg,'#000000',0.05),
-      gutter: dark?mix(bg,'#ffffff',0.06):mix(bg,'#000000',0.035),
-      muted:muted, link: dark?'#58a6ff':'#0969da',
-      str: dark?'#7ee787':'#2f7d4f', cmt:muted, kw: dark?'#79c0ff':'#9A3B1E',
-      num: dark?'#f0883e':'#B5651D', tag: dark?'#7ee787':'#2A6F97'};
+      gutter: dark?mix(bg,'#ffffff',0.05):mix(bg,'#000000',0.03),
+      muted:muted,
+      link:dark?'#79B8FF':'#15579A',
+      str:dark?'#7EE787':'#1F6F3F',
+      cmt:muted,
+      kw:dark?'#79C0FF':'#8F3812',
+      num:dark?'#F0883E':'#7A4A0A',
+      tag:dark?'#7EE787':'#1A5A7A'
+    };
+    return p;
   }
-  function setAttr(key){ document.documentElement.setAttribute('data-theme',key); }
+
+  function buildCSS(p){
+    var s = [];
+    function r(sel, decl){ s.push(sel+'{'+decl+'}'); }
+    r('body','background:'+p.bg+';color:'+p.fg);
+    r('html','background:'+p.bg);
+    r('#bar','background:'+p.bar+';border-color:'+p.border);
+    r('#bar .btn','background:'+p.bg+';border-color:'+p.border+';color:'+p.fg);
+    r('#bar .meta','color:'+p.muted);
+    r('#bar .status','color:'+(isDark(p.bg)?'#3fb950':'#2a8'));
+    r('#palette','background:'+p.bg+';color:'+p.fg+';border-color:'+p.border);
+    r('#palette .psec','border-color:'+p.border);
+    r('#palette input','background:'+p.bg+';color:'+p.fg+';border-color:'+p.border);
+    r('#palette #customPreview','border-color:'+p.border);
+    r('.md a','color:'+p.link);
+    r('.md code,.md pre','background:'+p.code);
+    r('.md pre','border-color:'+p.border);
+    r('.md h1,.md h2','border-color:'+p.border);
+    r('.md blockquote','border-color:'+p.border+';color:'+p.muted);
+    r('.md th,.md td','border-color:'+p.border);
+    r('.md hr','border-color:'+p.border);
+    r('.md kbd','background:'+p.code+';border-color:'+p.border);
+    r('#edit','background:'+p.bg+';color:'+p.fg);
+    r('.codebox .code','background:'+p.code);
+    r('.codebox .gutter','background:'+p.gutter+';border-color:'+p.border+';color:'+p.muted);
+    r('#empty','color:'+p.muted);
+    r('.str','color:'+p.str);
+    r('.cmt','color:'+p.cmt);
+    r('.kw','color:'+p.kw);
+    r('.num','color:'+p.num);
+    r('.tag','color:'+p.tag);
+    return s.join('\n');
+  }
+
+  function setStyleCss(st, css){
+    try{
+      if(st.styleSheet){ st.styleSheet.cssText = css; }
+      else { st.innerHTML = css; }
+    }catch(e){}
+  }
+
+  function injectTheme(key){
+    var p = PALETTES[key] || PALETTES[DEFAULT_THEME];
+    var css = buildCSS(p);
+    var st = document.getElementById('theme');
+    if(!st){
+      st = document.createElement('style');
+      st.id = 'theme';
+      var head = document.getElementsByTagName('head')[0];
+      if(head) head.appendChild(st);
+    }
+    setStyleCss(st, css);
+    document.documentElement.setAttribute('data-theme', key);
+  }
+
   function persist(o){ try{ if(window.external && window.external.saveSettings){ window.external.saveSettings(JSON.stringify(o)); } }catch(e){} }
+
   function markActive(key){
     var box=document.getElementById('swatches'); if(!box) return;
     var nodes=box.childNodes;
-    for(var i=0;i<nodes.length;i++){ var n=nodes[i]; if(n.getAttribute && n.getAttribute('data-key')){ var on=(n.getAttribute('data-key')===key); n.style.outline = on?'2px solid #0969da':'none'; n.style.outlineOffset='1px'; } }
+    for(var i=0;i<nodes.length;i++){
+      var n=nodes[i];
+      if(n && n.getAttribute && n.getAttribute('data-key')){
+        var on=(n.getAttribute('data-key')===key);
+        n.style.outline = on?'2px solid #0969da':'none';
+        n.style.outlineOffset='1px';
+      }
+    }
   }
+
+  function updateThemeUI(){
+    var key = document.documentElement.getAttribute('data-theme') || DEFAULT_THEME;
+    var b=document.getElementById('themeBtn');
+    if(b) b.innerText='配色：'+(PALETTES[key]?PALETTES[key].name:'默认');
+    markActive(key);
+    var cb=document.getElementById('customBg'), cf=document.getElementById('customFg'), pv=document.getElementById('customPreview');
+    if(PALETTES['custom']){ if(cb) cb.value=PALETTES['custom'].bg; if(cf) cf.value=PALETTES['custom'].fg; if(pv) pv.style.background=PALETTES['custom'].bg; }
+  }
+
   function setTheme(key){
-    if(!PALETTES[key]) key=DEFAULT_THEME;
-    setAttr(key); persist({mode:'preset', key:key}); markActive(key);
-    var b=document.getElementById('themeBtn'); if(b) b.innerText='配色：'+PALETTES[key].name;
+    if(!PALETTES[key]) key = DEFAULT_THEME;
+    injectTheme(key);
+    persist(key==='custom' ? {mode:'custom', bg:PALETTES[key].bg, fg:PALETTES[key].fg} : {mode:'preset', key:key});
+    updateThemeUI();
   }
-  function applyCustom(bg,fg){
-    bg=normHex(bg); fg=normHex(fg);
-    if(!bg||!fg) return false;
-    var p=derivePalette(bg,fg);
-    var css=buildCSS('custom',p);
-    var st=document.getElementById('customTheme');
-    if(!st){ st=document.createElement('style'); st.id='customTheme'; document.getElementsByTagName('head')[0].appendChild(st); }
-    st.textContent=css; setAttr('custom'); persist({mode:'custom', bg:bg, fg:fg}); markActive('custom');
-    var b=document.getElementById('themeBtn'); if(b) b.innerText='配色：自定义';
+
+  function applyCustom(bg, fg){
+    bg = normHex(bg); fg = normHex(fg);
+    if(!bg || !fg) return false;
+    PALETTES['custom'] = derivePalette(bg, fg);
+    setTheme('custom');
     return true;
   }
+
   function cycleTheme(){ var i=THEME_ORDER.indexOf(document.documentElement.getAttribute('data-theme')); if(i<0)i=0; setTheme(THEME_ORDER[(i+1)%THEME_ORDER.length]); }
+
   function buildSwatches(){
     var box=document.getElementById('swatches'); if(!box) return;
-    for(var i=0;i<THEME_ORDER.length;i++){ (function(k){ var p=PALETTES[k]; var el=document.createElement('div'); el.setAttribute('data-key',k); el.title=p.name; el.style.cssText='width:46px;height:34px;border-radius:6px;border:1px solid #bbb;cursor:pointer;position:relative;overflow:hidden'; el.innerHTML='<div style="position:absolute;inset:0;background:'+p.bg+'"></div><div style="position:absolute;left:5px;bottom:1px;font-size:10px;line-height:1.2;color:'+p.fg+';text-shadow:0 0 2px '+p.bg+'">'+p.name+'</div>'; el.onclick=function(){ setTheme(k); }; box.appendChild(el); })(THEME_ORDER[i]); }
+    for(var i=0;i<THEME_ORDER.length;i++){
+      (function(k){
+        var p=PALETTES[k];
+        var el=document.createElement('div');
+        el.setAttribute('data-key',k);
+        el.title=p.name;
+        el.style.cssText='width:46px;height:34px;border-radius:6px;border:1px solid #bbb;cursor:pointer;position:relative;overflow:hidden';
+        el.innerHTML='<div style="position:absolute;inset:0;background:'+p.bg+'"></div><div style="position:absolute;left:5px;bottom:1px;font-size:10px;line-height:1.2;color:'+p.fg+';">'+p.name+'</div>';
+        el.onclick=function(){ setTheme(k); };
+        box.appendChild(el);
+      })(THEME_ORDER[i]);
+    }
   }
+
   function initTheme(s){
-    if(s && s.mode==='custom' && s.bg && s.fg){ applyCustom(s.bg, s.fg); }
-    else { setTheme(s && s.key && PALETTES[s.key] ? s.key : DEFAULT_THEME); }
+    if(s && s.mode==='custom' && s.bg && s.fg){
+      PALETTES['custom'] = derivePalette(s.bg, s.fg);
+      setTheme('custom');
+    } else {
+      setTheme(s && s.key && PALETTES[s.key] ? s.key : DEFAULT_THEME);
+    }
+  }
+
+  /* ===== Markdown 预处理与后处理 ===== */
+  function mdPreproc(src){
+    // 将 @image#1:Clipboard_Screenshot.png 转成标准 Markdown 图片
+    src = src.replace(/@image#(\d+):([^\s)\]\>]+)/g, function(m,n,file){ return '!['+file+']('+file+')'; });
+    return src;
+  }
+  function mdPostproc(html){
+    try{
+      var div = document.createElement('div');
+      div.innerHTML = html;
+      var codes = div.getElementsByTagName('code');
+      for(var i=0;i<codes.length;i++){
+        var code = codes[i];
+        var cls = code.className || '';
+        var m = cls.match(/lang-(\w+)/) || cls.match(/language-(\w+)/);
+        if(m){
+          var lang = m[1].toLowerCase();
+          var text = code.innerText || code.textContent || '';
+          code.innerHTML = highlight(text, lang);
+        }
+      }
+      return div.innerHTML;
+    }catch(e){ return html; }
   }
 
   /* ===== 渲染 ===== */
+  function renderPlainText(text){
+    var lines = text.split('\n').length, gut='';
+    for(var i=1;i<=lines;i++){ gut += i + (i<lines?'\n':''); }
+    return '<table class="codebox"><tr><td class="gutter">'+esc(gut)+'</td><td class="code"><pre><code>'+esc(text)+'</code></pre></td></tr></table>';
+  }
+
   function render(){
     var view=document.getElementById('view');
     var ta=document.getElementById('edit');
@@ -323,14 +432,19 @@
       return;
     }
     if(isMd){
-      try{ view.innerHTML='<div class="md">'+marked(content)+'</div>'; }
-      catch(e){ view.innerHTML='<p>渲染错误：'+esc(e.message)+'</p>'; }
+      var md = mdPreproc(content);
+      var html = '';
+      try { html = marked(md); } catch(e){ html = '<p>渲染错误：'+esc(e.message)+'</p>'; }
+      html = mdPostproc(html);
+      view.innerHTML = '<div class="md">'+html+'</div>';
+    } else if(ext==='txt' || ext==='text' || ext==='log'){
+      view.innerHTML = renderPlainText(content);
     } else {
       var lang = LANG_BY_EXT[ext] ? ext : '_text';
       var html = highlight(content, lang);
       var lines = content.split('\n').length, gut='';
       for(var i=1;i<=lines;i++){ gut += i + (i<lines?'\n':''); }
-      view.innerHTML='<table class="codebox"><tr><td class="gutter">'+esc(gut)+'</td><td class="code"><pre><code>'+html+'</code></pre></td></tr></table>';
+      view.innerHTML = '<table class="codebox"><tr><td class="gutter">'+esc(gut)+'</td><td class="code"><pre><code>'+html+'</code></pre></td></tr></table>';
     }
   }
 
@@ -372,36 +486,42 @@
     var settings = {};
     try{ if(raw) settings = JSON.parse(raw); }catch(e){ settings={}; }
     initTheme(settings);
+
     var meta=document.getElementById('meta');
     if(meta) meta.innerText = name + (isMd?'  ·  Markdown' : ((LANG_BY_EXT[ext] && LANG_BY_EXT[ext]!=='_text')?('  ·  '+ext.toUpperCase()+' 代码'):'  ·  文本'));
+
     render();
-    document.getElementById('editBtn').onclick=function(){
-      if(this.value==='编辑') enterEdit(); else cancelEdit();
-    };
+
+    document.getElementById('editBtn').onclick=function(){ if(this.value==='编辑') enterEdit(); else cancelEdit(); };
     document.getElementById('saveBtn').onclick=save;
+
     var themeBtn=document.getElementById('themeBtn');
-    if(themeBtn) themeBtn.onclick=function(){ var p=document.getElementById('palette'); p.style.display = (p.style.display==='block')?'none':'block'; };
-    var closeP=document.getElementById('closePalette'); if(closeP) closeP.onclick=function(){ document.getElementById('palette').style.display='none'; };
+    if(themeBtn) themeBtn.onclick=function(){ var p=document.getElementById('palette'); p.style.display=(p.style.display==='block')?'none':'block'; };
+
+    var closeP=document.getElementById('closePalette');
+    if(closeP) closeP.onclick=function(){ document.getElementById('palette').style.display='none'; };
+
     var applyC=document.getElementById('applyCustom');
     if(applyC) applyC.onclick=function(){
       var bg=document.getElementById('customBg').value, fg=document.getElementById('customFg').value;
       var msg=document.getElementById('customMsg');
-      if(!normHex(bg)||!normHex(fg)){ if(msg) msg.innerText='请输入 6 位十六进制颜色，如 #DCE2F1'; return; }
+      if(!normHex(bg) || !normHex(fg)){ if(msg) msg.innerText='请输入 6 位十六进制颜色，如 #DCE2F1'; return; }
       if(msg) msg.innerText='';
-      applyCustom(bg,fg);
-      var pv=document.getElementById('customPreview'); if(pv) pv.style.background=normHex(bg);
+      applyCustom(bg, fg);
+      document.getElementById('palette').style.display='none';
     };
+
     var bgInput=document.getElementById('customBg'), fgInput=document.getElementById('customFg');
     function livePreview(){ var pv=document.getElementById('customPreview'); if(!pv) return; var b=normHex(bgInput.value); if(b) pv.style.background=b; }
     if(bgInput) bgInput.onkeyup=livePreview; if(fgInput) fgInput.onkeyup=livePreview;
+
     var ta=document.getElementById('edit');
     ta.onkeydown=function(e){
-      if((e.ctrlKey||e.metaKey) && (e.key==='s'||e.keyCode===83)){ e.preventDefault(); save(); }
+      if((e.ctrlKey||e.metaKey) && (e.key==='s'||e.keyCode===83)){ if(e.preventDefault) e.preventDefault(); else e.returnValue=false; save(); }
     };
   };
 
   window.cycleTheme=cycleTheme;
-  injectThemes();
   buildSwatches();
 })();
 </script>
