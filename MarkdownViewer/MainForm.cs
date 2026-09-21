@@ -15,6 +15,8 @@ namespace MarkdownViewer
         public ScriptBridge(MainForm f) { form = f; }
         public void SaveFile(string content) { form.SaveCurrentFile(content); }
         public void SaveSettings(string json) { form.SaveSettings(json); }
+        public void SetEditState(bool editing, bool canSave) { form.SetEditState(editing, canSave); }
+        public void SetFileName(string name) { form.SetFileName(name); }
     }
 
     public class MainForm : Form
@@ -22,6 +24,9 @@ namespace MarkdownViewer
         private WebBrowser browser;
         private string currentFile;
         private string settingsJson = "";
+        private ToolStripButton tsEdit;
+        private ToolStripButton tsSave;
+        private ToolStripLabel tsName;
 
         public MainForm(string file)
         {
@@ -34,13 +39,32 @@ namespace MarkdownViewer
 
             var menu = new MenuStrip();
             menu.Dock = DockStyle.Top;
+
             var fileMenu = new ToolStripMenuItem("文件(&F)");
             fileMenu.DropDownItems.Add(new ToolStripMenuItem("打开(&O)", null, (s, e) => OpenFile()));
             fileMenu.DropDownItems.Add(new ToolStripMenuItem("退出(&X)", null, (s, e) => Application.Exit()));
+
             var viewMenu = new ToolStripMenuItem("视图(&V)");
             viewMenu.DropDownItems.Add(new ToolStripMenuItem("切换主题(&T)", null, (s, e) => ToggleTheme()));
+
+            tsName = new ToolStripLabel("未命名") { Overflow = ToolStripItemOverflow.Never };
+            tsEdit = new ToolStripButton("编辑") { Overflow = ToolStripItemOverflow.Never };
+            tsSave = new ToolStripButton("保存") { Overflow = ToolStripItemOverflow.Never, Enabled = false };
+            var tsTheme = new ToolStripButton("配色") { Overflow = ToolStripItemOverflow.Never };
+
+            tsEdit.Click += (s, e) => browser.Document?.InvokeScript("enterEdit");
+            tsSave.Click += (s, e) => browser.Document?.InvokeScript("save");
+            tsTheme.Click += (s, e) => browser.Document?.InvokeScript("togglePalette");
+
             menu.Items.Add(fileMenu);
             menu.Items.Add(viewMenu);
+            menu.Items.Add(new ToolStripSeparator() { Overflow = ToolStripItemOverflow.Never });
+            menu.Items.Add(tsName);
+            menu.Items.Add(new ToolStripSeparator() { Overflow = ToolStripItemOverflow.Never });
+            menu.Items.Add(tsEdit);
+            menu.Items.Add(tsSave);
+            menu.Items.Add(tsTheme);
+
             this.MainMenuStrip = menu;
             this.Controls.Add(menu);
 
@@ -81,6 +105,17 @@ namespace MarkdownViewer
                 settingsJson = json; // 让本次会话内打开新文件也沿用上次配色
             }
             catch { }
+        }
+
+        public void SetEditState(bool editing, bool canSave)
+        {
+            if (tsEdit != null) tsEdit.Text = editing ? "取消" : "编辑";
+            if (tsSave != null) tsSave.Enabled = canSave;
+        }
+
+        public void SetFileName(string name)
+        {
+            if (tsName != null) tsName.Text = string.IsNullOrEmpty(name) ? "未命名" : name;
         }
 
         private string SettingsPath()
@@ -151,6 +186,7 @@ namespace MarkdownViewer
                     ext = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
                     name = Path.GetFileName(path);
                     this.Text = "文件查看器 — " + name;
+                    if (tsName != null) tsName.Text = name;
                 }
                 else
                 {

@@ -1,24 +1,21 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="sea">
+<html lang="zh-CN" data-theme="warm">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <title>文件查看器</title>
 <style>*{box-sizing:border-box}
-  html{background:#DCE2F1}
+  html{background:#FAF9F6}
   html,body{margin:0;height:100%}
-  body{font-family:"Segoe UI","Microsoft YaHei UI","PingFang SC","Hiragino Sans GB","Noto Sans CJK SC",sans-serif;font-size:16px;line-height:1.75;-ms-text-size-adjust:100%;background:#DCE2F1;color:#1E293B}
+  body{font-family:"Segoe UI","Microsoft YaHei UI","PingFang SC","Hiragino Sans GB","Noto Sans CJK SC",sans-serif;font-size:16px;line-height:1.75;-ms-text-size-adjust:100%;background:#FAF9F6;color:#1E293B}
 
-  /* ===== 顶部工具栏（文件路径与按钮同一排） ===== */
-  #bar{position:fixed;top:0;left:0;right:0;height:46px;z-index:10;border-bottom:1px solid #B9C4DC;padding:7px 12px;overflow:hidden;background:#CFD8E8}
-  #bar .meta{float:left;line-height:32px;font-size:13px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;color:#4A5568}
-  #bar .right{float:right;white-space:nowrap}
-  #bar .btn{font:inherit;font-size:13px;padding:5px 12px;margin-left:6px;border:1px solid #B9C4DC;border-radius:6px;background:#DCE2F1;color:#1E293B;cursor:pointer}
-  #bar .btn:disabled{opacity:.45;cursor:default}
-  #bar .status{display:inline-block;margin-left:10px;line-height:32px;opacity:0;transition:opacity .3s;color:#2a8}
+  /* ===== 顶部状态条（只显示文件名/保存提示，按钮在 WinForms 菜单栏） ===== */
+  #bar{position:fixed;top:0;left:0;right:0;height:32px;z-index:10;border-bottom:1px solid #B9C4DC;padding:6px 12px;overflow:hidden;background:#F0EEE8}
+  #bar .meta{float:left;line-height:20px;font-size:13px;max-width:85%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;color:#4A5568}
+  #bar .status{float:right;line-height:20px;opacity:0;transition:opacity .3s;color:#2a8;font-size:13px}
 
-  #view{margin-top:46px;padding:22px 22px 90px;max-width:1000px}
-  #edit{display:none;margin-top:46px;width:100%;height:calc(100% - 46px);border:0;resize:none;padding:18px 22px;font-family:Consolas,"Lucida Console","Courier New","Microsoft YaHei",monospace;font-size:14.5px;line-height:1.75;outline:none}
+  #view{margin-top:32px;padding:22px 22px 90px;max-width:1000px}
+  #edit{display:none;margin-top:32px;width:100%;height:calc(100% - 32px);border:0;resize:none;padding:18px 22px;font-family:Consolas,"Lucida Console","Courier New","Microsoft YaHei",monospace;font-size:14.5px;line-height:1.75;outline:none}
 
   /* ===== Markdown 排版 ===== */
   .md h1,.md h2,.md h3,.md h4{margin:24px 0 16px;font-weight:600;line-height:1.3}
@@ -52,7 +49,7 @@
   #empty h1{font-size:20px;font-weight:600}
 
   /* ===== 配色面板 ===== */
-  #palette{display:none;position:fixed;top:46px;right:12px;z-index:30;border:1px solid;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:12px;width:248px;font-size:13px;background:#DCE2F1;color:#1E293B}
+  #palette{display:none;position:fixed;top:32px;right:12px;z-index:30;border:1px solid;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:12px;width:248px;font-size:13px;background:#DCE2F1;color:#1E293B}
   #palette .ptitle{font-weight:600;margin-bottom:8px}
   #palette #swatches{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
   #palette .psec{border-top:1px solid #B9C4DC;padding-top:10px}
@@ -65,12 +62,7 @@
 <body>
 <div id="bar">
   <span class="meta" id="meta"></span>
-  <span class="right">
-    <button class="btn" id="editBtn">编辑</button>
-    <button class="btn" id="saveBtn" disabled>保存</button>
-    <button class="btn" id="themeBtn">配色</button>
-    <span class="status" id="status"></span>
-  </span>
+  <span class="status" id="status"></span>
 </div>
 <div id="view"></div>
 <textarea id="edit" spellcheck="false"></textarea>
@@ -241,7 +233,7 @@
     night:   {name:'夜间',      bg:'#1E2124', fg:'#E6EAEF', bar:'#26292D', border:'#3A4048', code:'#272B30', gutter:'#22262A', muted:'#9BA5B0', link:'#79B8FF', str:'#7EE787', cmt:'#9BA5B0', kw:'#79C0FF', num:'#F0883E', tag:'#7EE787'}
   };
   var THEME_ORDER = ['sea','gray','bluegray','green','grass','purple','warm','white','night'];
-  var DEFAULT_THEME = 'sea';
+  var DEFAULT_THEME = 'warm';
 
   function hexToRgb(h){ h=h.replace('#',''); if(h.length===3) h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2]; return [parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)]; }
   function rgbToHex(a){ return '#'+a.map(function(x){ var v=Math.max(0,Math.min(255,Math.round(x))).toString(16); return v.length<2?'0'+v:v; }).join(''); }
@@ -357,6 +349,8 @@
     bg = normHex(bg); fg = normHex(fg);
     if(!bg || !fg) return false;
     PALETTES['custom'] = derivePalette(bg, fg);
+    // 直接兜底写 body，确保自定义色立即生效，不被硬编码或旧样式覆盖
+    try{ document.body.style.backgroundColor=bg; document.body.style.color=fg; }catch(e){}
     setTheme('custom');
     return true;
   }
@@ -420,12 +414,12 @@
     return '<table class="codebox"><tr><td class="gutter">'+esc(gut)+'</td><td class="code"><pre><code>'+esc(text)+'</code></pre></td></tr></table>';
   }
 
+  var editingNow=false, canSaveNow=false;
   function render(){
     var view=document.getElementById('view');
     var ta=document.getElementById('edit');
-    var editBtn=document.getElementById('editBtn');
-    var saveBtn=document.getElementById('saveBtn');
-    ta.style.display='none'; editBtn.value='编辑'; saveBtn.disabled=true;
+    editingNow=false; canSaveNow=false; notifyState();
+    ta.style.display='none';
     view.style.display='block';
     if(!content){
       view.innerHTML='<div id="empty"><h1>轻量离线文件查看器</h1><p>用窗口左上角菜单「文件 → 打开」选择文件。</p><p>支持 Markdown 与代码文件（.txt/.sql/.py 等），可编辑并保存。</p></div>';
@@ -454,16 +448,14 @@
     ta.value=content;
     document.getElementById('view').style.display='none';
     ta.style.display='block';
-    document.getElementById('editBtn').value='取消';
-    document.getElementById('saveBtn').disabled=false;
+    editingNow=true; canSaveNow=true; notifyState();
     ta.focus();
   }
   function cancelEdit(){
     var ta=document.getElementById('edit');
     ta.style.display='none';
     document.getElementById('view').style.display='block';
-    document.getElementById('editBtn').value='编辑';
-    document.getElementById('saveBtn').disabled=true;
+    editingNow=false; canSaveNow=false; notifyState();
   }
   function save(){
     var ta=document.getElementById('edit');
@@ -473,13 +465,26 @@
       try{ window.external.saveFile(content); flash('已保存'); }
       catch(e){ flash('保存失败：'+e.message); return; }
     }
-    cancelEdit();
+    editingNow=false; canSaveNow=false; notifyState();
     render();
   }
   function flash(msg){
     var s=document.getElementById('status');
     if(s){ s.innerText=msg; s.style.opacity=1; setTimeout(function(){ s.style.opacity=0; },1600); }
   }
+
+  function notifyState(){
+    try{ if(window.external && window.external.setEditState){ window.external.setEditState(editingNow, canSaveNow); } }catch(e){}
+  }
+  function notifyName(){
+    try{ if(window.external && window.external.setFileName){ window.external.setFileName(name); } }catch(e){}
+  }
+  function togglePalette(){
+    var p=document.getElementById('palette');
+    if(!p) return;
+    p.style.display=(p.style.display==='block')?'none':'block';
+  }
+  window.enterEdit=enterEdit; window.cancelEdit=cancelEdit; window.save=save; window.togglePalette=togglePalette; window.cycleTheme=cycleTheme;
 
   window.onload=function(){
     var raw = (typeof SETSB64!=='undefined' && SETSB64) ? deb64(SETSB64) : '';
@@ -492,12 +497,6 @@
 
     render();
 
-    document.getElementById('editBtn').onclick=function(){ if(this.value==='编辑') enterEdit(); else cancelEdit(); };
-    document.getElementById('saveBtn').onclick=save;
-
-    var themeBtn=document.getElementById('themeBtn');
-    if(themeBtn) themeBtn.onclick=function(){ var p=document.getElementById('palette'); p.style.display=(p.style.display==='block')?'none':'block'; };
-
     var closeP=document.getElementById('closePalette');
     if(closeP) closeP.onclick=function(){ document.getElementById('palette').style.display='none'; };
 
@@ -507,8 +506,10 @@
       var msg=document.getElementById('customMsg');
       if(!normHex(bg) || !normHex(fg)){ if(msg) msg.innerText='请输入 6 位十六进制颜色，如 #DCE2F1'; return; }
       if(msg) msg.innerText='';
-      applyCustom(bg, fg);
-      document.getElementById('palette').style.display='none';
+      var ok=applyCustom(bg, fg);
+      if(ok){
+        document.getElementById('palette').style.display='none';
+      }
     };
 
     var bgInput=document.getElementById('customBg'), fgInput=document.getElementById('customFg');
@@ -519,9 +520,10 @@
     ta.onkeydown=function(e){
       if((e.ctrlKey||e.metaKey) && (e.key==='s'||e.keyCode===83)){ if(e.preventDefault) e.preventDefault(); else e.returnValue=false; save(); }
     };
+
+    notifyName();
   };
 
-  window.cycleTheme=cycleTheme;
   buildSwatches();
 })();
 </script>
