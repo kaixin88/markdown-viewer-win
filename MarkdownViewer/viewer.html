@@ -491,10 +491,12 @@
     var view=document.getElementById('view');
     if(view){ view.style.display='block'; }
     editingNow=false; canSaveNow=false; notifyState();
+    notifyLog('ensureViewMode 完成: edit.display=' + (ta?ta.style.display:'?') + ', view.display=' + (view?view.style.display:'?'));
   }
   function save(){
     var ta=document.getElementById('edit');
     if(editingNow && ta) content=ta.value;   // 编辑中一律以编辑框当前内容为准（含清空文件的情况）
+    notifyLog('页面 save() 执行，内容长度=' + (content||'').length);
     if(window.external && window.external.saveFile){
       try{ window.external.saveFile(content); }
       catch(e){ flash('保存失败：'+(e.message||e)); return; }
@@ -528,6 +530,11 @@
     if(s){ s.innerText=msg; s.style.opacity=1; setTimeout(function(){ s.style.opacity=0; },1600); }
   }
 
+  // 诊断通道：把页面侧的关键事件写到 C# 日志（%TEMP%\mdviewer.log），
+  // 用来判断 Ctrl+S 到底是"被 C# 接走"还是"到了网页"。
+  function notifyLog(msg){
+    try{ if(window.external && window.external.log) window.external.log(String(msg)); }catch(e){}
+  }
   function notifyState(){
     try{ if(window.external && window.external.setEditState){ window.external.setEditState(editingNow, canSaveNow); } }catch(e){}
   }
@@ -592,7 +599,11 @@
     step(function(){
       var ta=document.getElementById('edit');
       ta.onkeydown=function(e){
-        if((e.ctrlKey||e.metaKey) && (e.key==='s'||e.keyCode===83)){ if(e.preventDefault) e.preventDefault(); else e.returnValue=false; save(); }
+        if((e.ctrlKey||e.metaKey) && (e.key==='s'||e.keyCode===83)){
+          notifyLog('textarea 捕获 Ctrl+S (keyCode='+(e.keyCode||'')+') -> 走页面 save()');
+          if(e.preventDefault) e.preventDefault(); else e.returnValue=false;
+          save();
+        }
       };
     });
 

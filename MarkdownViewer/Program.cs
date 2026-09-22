@@ -23,29 +23,24 @@ namespace MarkdownViewer
             string file = null;
             string logPath = null;
             bool selfTest = false;
+            bool synth = false;
             if (args != null)
             {
                 foreach (var a in args)
                 {
                     if (string.IsNullOrEmpty(a)) continue;
                     if (a == "--selftest") { selfTest = true; continue; }
+                    if (a == "--synth") { synth = true; continue; }
                     if (a.StartsWith("--log=")) { logPath = a.Substring(6); continue; }
                     if (a.StartsWith("-")) continue;
-                    if (System.IO.File.Exists(a))
-                    {
-                        file = a;
-                        break;
-                    }
+                    // 注意：这里不能 break，否则后面的 --log= 之类的开关会被跳过
+                    if (System.IO.File.Exists(a)) file = a;
                 }
-            }
-            if (selfTest && string.IsNullOrEmpty(logPath))
-            {
-                logPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "mdviewer-selftest.log");
             }
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm(file, logPath, selfTest));
+            Application.Run(new MainForm(file, logPath, selfTest, synth));
         }
     }
 }

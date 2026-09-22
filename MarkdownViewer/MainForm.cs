@@ -18,12 +18,22 @@ namespace MarkdownViewer
         public void SetEditState(bool editing, bool canSave) { form.SetEditState(editing, canSave); }
         public void SetFileName(string name) { form.SetFileName(name); }
         public void SetThemeName(string name) { form.SetThemeName(name); }
+        public void Log(string msg) { form.LogFromJs(msg); }
     }
 
     public class MainForm : Form
     {
         // 版本标识：显示在标题栏，用来一眼确认跑的是不是最新构建
-        private const string VER = "v7";
+        private const string VER = "v8";
+        // 模拟真实按键（--selftest 用）：走完整窗口消息流程，才能复现"焦点在 textarea"的场景
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+        private const byte VK_CONTROL = 0x11;
+        private const byte VK_S = 0x53;
+        private const uint KEYEVENTF_KEYUP = 0x0002;
+
         private WebBrowser browser;
         private string currentFile;
         private string settingsJson = "";
@@ -31,19 +41,27 @@ namespace MarkdownViewer
         private ToolStripButton tsSave;
         private ToolStripButton tsTheme;
         private ToolStripLabel tsName;
-        private string logPath;      // 仅 --selftest / 显式指定时非空，正常运行不产生日志文件
+        private string logPath;      // 默认写 %TEMP%\mdviewer.log（排障用），可用 --log= 指定
+        private bool synth;          // --synth：自检直接调 ProcessCmdKey，而不是模拟真实按键
 
-        public MainForm(string file) : this(file, null, false) { }
+        public MainForm(string file) : this(file, null, false, false) { }
 
-        public MainForm(string file, string logPath, bool selfTest)
+        public MainForm(string file, string logPath, bool selfTest, bool synth)
         {
-            this.logPath = logPath;
+            this.synth = synth;
+            this.logPath = string.IsNullOrEmpty(logPath)
+                ? Path.Combine(Path.GetTempPath(), "mdviewer.log")
+                : logPath;
             SetBrowserEmulation();
             currentFile = file;
             settingsJson = LoadSettings();
             this.Text = "文件查看器 " + VER;
             this.Width = 980;
             this.Height = 740;
+            Log("=== 启动 " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                + " | 版本=" + VER
+                + " | 文件=" + (string.IsNullOrEmpty(file) ? "<无>" : file)
+                + " | selftest=" + selfTest + " | synth=" + synth + " ===");
 
             var menu = new MenuStrip();
             menu.Dock = DockStyle.Top;
@@ -101,6 +119,9 @@ namespace MarkdownViewer
             LoadFile(currentFile);
             if (selfTest) RunSelfTest();
         }
+
+        // 页面通过 window.external.log 写进来的诊断信息，用来判断按键有没有到网页侧
+        public void LogFromJs(string msg) { Log("[JS] " + msg); }
 
         private void Log(string msg)
         {
@@ -392,7 +413,9 @@ namespace MarkdownViewer
             t.Start();
         }
 
-        // ===== 自检（--selftest）：不依赖任何 UI 交互，自动复现「编辑 -> Ctrl+S」并记录每一步结果 =====
+        // ===== 自检（--selftest）=====
+        // 默认用 keybd_event 发【真实 Ctrl+S】，走完整窗口消息流程（复现"焦点在 textarea"的场景）；
+        // 加 --synth 则直接调 ProcessCmdKey，绕过消息队列，便于对照定位。
         private void RunSelfTest()
         {
             var t = new Timer();
@@ -401,7 +424,7 @@ namespace MarkdownViewer
             {
                 t.Stop();
                 t.Dispose();
-                Log("=== selftest start ===");
+                Log("=== selftest start (synth=" + synth + ") ===");
                 try
                 {
                     var doc = browser.Document;
@@ -418,44 +441,39 @@ namespace MarkdownViewer
                     d.value = "SELFTEST-NEW-CONTENT\r\nsecond line";
                     Log("已写入编辑框新内容");
 
-                    // 用真正的快捷键入口调用，完整复现用户场景
-                    Message m = new Message();
-                    bool handled = ProcessCmdKey(ref m, Keys.Control | Keys.S);
-                    Log("ProcessCmdKey(Ctrl+S) 返回 " + handled);
-
-                    var t2 = new Timer();
-                    t2.Interval = 1500;
-                    t2.Tick += (s2, e2) =>
+                    // 等页面把焦点交给 textarea，再触发 Ctrl+S
+                    var t1 = new Timer();
+                    t1.Interval = 400;
+                    t1.Tick += (s1, e1) =>
                     {
-                        t2.Stop();
-                        t2.Dispose();
+                        t1.Stop();
+                        t1.Dispose();
                         try
                         {
-                            var doc2 = browser.Document;
-                            string e1 = "?", v1 = "?";
-                            var ed = doc2.GetElementById("edit");
-                            if (ed != null && ed.DomElement != null)
+                            try { this.Activate(); } catch { }
+                            try { SetForegroundWindow(this.Handle); } catch { }
+                            Application.DoEvents();
+
+                            if (synth)
                             {
-                                dynamic edd = ed.DomElement;
-                                dynamic eds = edd.style;
-                                try { e1 = (string)eds.display; } catch { }
+                                Log("触发方式：直接调用 ProcessCmdKey（绕过消息队列）");
+                                Message m = new Message();
+                                bool handled = ProcessCmdKey(ref m, Keys.Control | Keys.S);
+                                Log("ProcessCmdKey(Ctrl+S) 返回 " + handled);
                             }
-                            var vw = doc2.GetElementById("view");
-                            if (vw != null && vw.DomElement != null)
+                            else
                             {
-                                dynamic vwd = vw.DomElement;
-                                dynamic vws = vwd.style;
-                                try { v1 = (string)vws.display; } catch { }
+                                Log("触发方式：keybd_event 模拟真实 Ctrl+S（焦点应在 textarea）");
+                                keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
+                                keybd_event(VK_S, 0, 0, UIntPtr.Zero);
+                                keybd_event(VK_S, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+                                keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
                             }
-                            Log("结果 edit.display='" + e1 + "'  view.display='" + v1 + "'");
-                            string onDisk = File.Exists(currentFile) ? File.ReadAllText(currentFile, Encoding.UTF8) : "<不存在>";
-                            Log("磁盘内容 = " + onDisk.Replace("\r", "\\r").Replace("\n", "\\n"));
                         }
-                        catch (Exception ex3) { Log("结果检查异常: " + ex3.Message); }
-                        Log("=== selftest end ===");
-                        Application.Exit();
+                        catch (Exception ex) { Log("触发异常: " + ex.Message); }
+                        ScheduleSelfTestCheck();
                     };
-                    t2.Start();
+                    t1.Start();
                 }
                 catch (Exception ex)
                 {
@@ -465,6 +483,43 @@ namespace MarkdownViewer
                 }
             };
             t.Start();
+        }
+
+        private void ScheduleSelfTestCheck()
+        {
+            var t2 = new Timer();
+            t2.Interval = 2200;
+            t2.Tick += (s2, e2) =>
+            {
+                t2.Stop();
+                t2.Dispose();
+                try
+                {
+                    var doc2 = browser.Document;
+                    string e1 = "?", v1 = "?";
+                    var ed = doc2.GetElementById("edit");
+                    if (ed != null && ed.DomElement != null)
+                    {
+                        dynamic edd = ed.DomElement;
+                        dynamic eds = edd.style;
+                        try { e1 = (string)eds.display; } catch { }
+                    }
+                    var vw = doc2.GetElementById("view");
+                    if (vw != null && vw.DomElement != null)
+                    {
+                        dynamic vwd = vw.DomElement;
+                        dynamic vws = vwd.style;
+                        try { v1 = (string)vws.display; } catch { }
+                    }
+                    Log("结果 edit.display='" + e1 + "'  view.display='" + v1 + "'");
+                    string onDisk = File.Exists(currentFile) ? File.ReadAllText(currentFile, Encoding.UTF8) : "<不存在>";
+                    Log("磁盘内容 = " + onDisk.Replace("\r", "\\r").Replace("\n", "\\n"));
+                }
+                catch (Exception ex3) { Log("结果检查异常: " + ex3.Message); }
+                Log("=== selftest end ===");
+                Application.Exit();
+            };
+            t2.Start();
         }
 
         private void SyncToolbar(bool viewMode)
