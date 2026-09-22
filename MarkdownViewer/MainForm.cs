@@ -24,15 +24,19 @@ namespace MarkdownViewer
     public class MainForm : Form, IMessageFilter
     {
         // 版本标识：显示在标题栏，用来一眼确认跑的是不是最新构建
-        private const string VER = "v9";
-        // 模拟真实按键（--selftest 用）：走完整窗口消息流程，才能复现"焦点在 textarea"的场景
+        private const string VER = "v10";
+        // 自检用：把按键消息直接投递到 IE 子窗口，不依赖前台焦点（keybd_event 在无焦点时会送丢）
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+        private static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string lpszClass, string lpszWindow);
         [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool SetForegroundWindow(IntPtr hWnd);
-        private const byte VK_CONTROL = 0x11;
-        private const byte VK_S = 0x53;
-        private const uint KEYEVENTF_KEYUP = 0x0002;
+        private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+        private const int WM_KEYDOWN = 0x0100;
+        private const int WM_KEYUP = 0x0101;
+        private const int VK_CONTROL_ = 0x11;
+        private const int VK_LCONTROL = 0xA2;
+        private const int VK_RCONTROL = 0xA3;
+        private const int VK_S = 0x53;
+        private bool ctrlDown;       // 自跟踪 Ctrl 状态：不依赖 Control.ModifierKeys（PostMessage/无焦点时它不准）
 
         private WebBrowser browser;
         private string currentFile;
@@ -113,12 +117,15 @@ namespace MarkdownViewer
             browser.ScriptErrorsSuppressed = true;
             browser.AllowNavigation = false;       // 查看器不跳转页面
             browser.AllowWebBrowserDrop = false;
+            // 关键修复：WebBrowser（IE 宿主）默认会把 Ctrl+S 当成自己的"保存网页"快捷键，
+            // 在 OLE 组件的 FPreTranslateMessage 阶段就吃掉，导致按键既到不了 WinForms 的
+            // ProcessCmdKey、也派发不到文档的 onkeydown —— 这就是"Ctrl+S 毫无反应"的根因。
+            // 关掉它的内置快捷键，按键才会正常冒泡上来。
+            browser.WebBrowserShortcutsEnabled = false;
             browser.ObjectForScripting = new ScriptBridge(this);
             this.Controls.Add(browser);
 
-            // 关键：WebBrowser（IE 宿主）会在加速键阶段把 Ctrl+S 之类整条吞掉，
-            // 既不冒泡到 WinForms 的 ProcessCmdKey，也不派发到文档的 onkeydown。
-            // 唯一能抢在它前面的是消息泵级的 IMessageFilter（PreFilterMessage）。
+            // 第二重：消息泵级拦截，抢在按键被派发之前。
             Application.AddMessageFilter(this);
 
             LoadFile(currentFile);
@@ -127,19 +134,31 @@ namespace MarkdownViewer
 
         // 消息泵层拦截 Ctrl+S。这里是所有按键消息的最前端，早于 WebBrowser 的加速键处理，
         // 也早于 ProcessCmdKey，所以不受 IE 吞键影响。只吃 Ctrl+S，其余按键原样放行。
+        // Ctrl 状态自己跟踪：Control.ModifierKeys 在 PostMessage / 无前台焦点时不可靠。
         public bool PreFilterMessage(ref Message m)
         {
-            const int WM_KEYDOWN = 0x0100;
-            const int WM_SYSKEYDOWN = 0x0104;
-            if (m.Msg == WM_KEYDOWN || m.Msg == WM_SYSKEYDOWN)
+            int vk = m.WParam.ToInt32();
+            if (m.Msg == WM_KEYDOWN || m.Msg == 0x0104 /*WM_SYSKEYDOWN*/)
             {
-                int vk = m.WParam.ToInt32();
-                if (vk == VK_S && (Control.ModifierKeys & Keys.Control) == Keys.Control)
+                if (vk == VK_CONTROL_ || vk == VK_LCONTROL || vk == VK_RCONTROL)
                 {
-                    Log("PreFilterMessage: 消息泵层捕获 Ctrl+S");
-                    SaveViaScript();
-                    return true;   // 吞掉，避免 IE 再把它当"保存网页"处理
+                    ctrlDown = true;
                 }
+                else if (vk == VK_S)
+                {
+                    bool ctrl = ctrlDown || (Control.ModifierKeys & Keys.Control) == Keys.Control;
+                    Log("PreFilterMessage: 收到 S 键 (ctrlDown=" + ctrlDown + ", ctrl=" + ctrl + ")");
+                    if (ctrl)
+                    {
+                        Log("PreFilterMessage: 消息泵层捕获 Ctrl+S -> 保存");
+                        SaveViaScript();
+                        return true;   // 吞掉，避免 IE 再把它当"保存网页"处理
+                    }
+                }
+            }
+            else if (m.Msg == WM_KEYUP || m.Msg == 0x0105 /*WM_SYSKEYUP*/)
+            {
+                if (vk == VK_CONTROL_ || vk == VK_LCONTROL || vk == VK_RCONTROL) ctrlDown = false;
             }
             return false;
         }
@@ -438,8 +457,8 @@ namespace MarkdownViewer
         }
 
         // ===== 自检（--selftest）=====
-        // 默认用 keybd_event 发【真实 Ctrl+S】，走完整窗口消息流程（复现"焦点在 textarea"的场景）；
-        // 加 --synth 则直接调 ProcessCmdKey，绕过消息队列，便于对照定位。
+        // 默认把真实按键消息 PostMessage 进 IE 子窗口（不依赖前台焦点，且必经消息泵的
+        // PreFilterMessage —— 正是要验证的那条路径）；加 --synth 则直接调 ProcessCmdKey 对照。
         private void RunSelfTest()
         {
             var t = new Timer();
@@ -475,7 +494,6 @@ namespace MarkdownViewer
                         try
                         {
                             try { this.Activate(); } catch { }
-                            try { SetForegroundWindow(this.Handle); } catch { }
                             Application.DoEvents();
 
                             if (synth)
@@ -487,11 +505,17 @@ namespace MarkdownViewer
                             }
                             else
                             {
-                                Log("触发方式：keybd_event 模拟真实 Ctrl+S（焦点应在 textarea）");
-                                keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
-                                keybd_event(VK_S, 0, 0, UIntPtr.Zero);
-                                keybd_event(VK_S, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-                                keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+                                // 把真实按键消息投进 IE 子窗口：不依赖前台焦点，且会经过消息泵
+                                // 的 PreFilterMessage —— 这正是要验证的那条路径。
+                                IntPtr ieHwnd = FindWindowEx(browser.Handle, IntPtr.Zero, "Internet Explorer_Server", null);
+                                IntPtr target = ieHwnd != IntPtr.Zero ? ieHwnd : browser.Handle;
+                                Log("触发方式：PostMessage 到 IE 窗口 (hwnd=" + target.ToString("X")
+                                    + ", 找到 IE 子窗口=" + (ieHwnd != IntPtr.Zero) + ")");
+                                // lParam: 重复次数1 / 扫描码 / 前态 / 转换位
+                                PostMessage(target, (uint)WM_KEYDOWN, (IntPtr)VK_CONTROL_, (IntPtr)0x001D0001);
+                                PostMessage(target, (uint)WM_KEYDOWN, (IntPtr)VK_S, (IntPtr)0x001F0001);
+                                PostMessage(target, (uint)WM_KEYUP, (IntPtr)VK_S, (IntPtr)0xC01F0001);
+                                PostMessage(target, (uint)WM_KEYUP, (IntPtr)VK_CONTROL_, (IntPtr)0xC01D0001);
                             }
                         }
                         catch (Exception ex) { Log("触发异常: " + ex.Message); }
