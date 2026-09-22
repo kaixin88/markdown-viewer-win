@@ -203,7 +203,7 @@ namespace MarkdownViewer
                 SaveFromEditor();
                 return true;
             }
-            return base.ProcessCmdKey(msg, keyData);
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         private void ToggleTheme()
