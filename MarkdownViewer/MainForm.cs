@@ -52,8 +52,22 @@ namespace MarkdownViewer
             tsSave = new ToolStripButton("保存") { Overflow = ToolStripItemOverflow.Never, Enabled = false };
             var tsTheme = new ToolStripButton("配色") { Overflow = ToolStripItemOverflow.Never };
 
-            tsEdit.Click += (s, e) => browser.Document?.InvokeScript("enterEdit");
-            tsSave.Click += (s, e) => browser.Document?.InvokeScript("save");
+            tsEdit.Click += (s, e) =>
+            {
+                if (tsEdit.Text == "编辑")
+                {
+                    browser.Document?.InvokeScript("enterEdit");
+                    tsEdit.Text = "取消";
+                    tsSave.Enabled = true;
+                }
+                else
+                {
+                    browser.Document?.InvokeScript("cancelEdit");
+                    tsEdit.Text = "编辑";
+                    tsSave.Enabled = false;
+                }
+            };
+            tsSave.Click += (s, e) => SaveFromEditor();
             tsTheme.Click += (s, e) => browser.Document?.InvokeScript("togglePalette");
 
             menu.Items.Add(fileMenu);
@@ -161,6 +175,35 @@ namespace MarkdownViewer
                     LoadFile(currentFile);
                 }
             }
+        }
+
+        // 从 WebBrowser 内的编辑框直接取内容写盘，不依赖 JS 桥接状态
+        private void SaveFromEditor()
+        {
+            try
+            {
+                var doc = browser.Document;
+                var ta = doc != null ? doc.GetElementById("edit") : null;
+                if (ta == null) return;
+                string content = ta.GetAttribute("value");
+                if (content == null) content = "";
+                SaveCurrentFile(content);
+                try { doc.InvokeScript("afterSave"); } catch { }
+                if (tsEdit != null) tsEdit.Text = "编辑";
+                if (tsSave != null) tsSave.Enabled = false;
+            }
+            catch { }
+        }
+
+        // 全局 Ctrl+S：焦点在任意位置（含菜单栏）都能保存
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == (Keys.Control | Keys.S))
+            {
+                SaveFromEditor();
+                return true;
+            }
+            return base.ProcessCmdKey(msg, keyData);
         }
 
         private void ToggleTheme()

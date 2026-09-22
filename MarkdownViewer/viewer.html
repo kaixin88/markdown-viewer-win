@@ -71,8 +71,8 @@
   <div id="swatches"></div>
   <div class="psec">自定义颜色</div>
   <div class="prow">
-    背景 <input id="customBg" type="text" value="#DCE2F1">
-    文字 <input id="customFg" type="text" value="#1E293B">
+    背景 <input id="customBg" type="text" value="#FAF9F6">
+    文字 <input id="customFg" type="text" value="#1A1A1A">
   </div>
   <div class="prow">
     <span id="customPreview"></span>
@@ -334,8 +334,9 @@
     var b=document.getElementById('themeBtn');
     if(b) b.innerText='配色：'+(PALETTES[key]?PALETTES[key].name:'默认');
     markActive(key);
+    var src = (key==='custom' && PALETTES['custom']) ? PALETTES['custom'] : PALETTES[key];
     var cb=document.getElementById('customBg'), cf=document.getElementById('customFg'), pv=document.getElementById('customPreview');
-    if(PALETTES['custom']){ if(cb) cb.value=PALETTES['custom'].bg; if(cf) cf.value=PALETTES['custom'].fg; if(pv) pv.style.background=PALETTES['custom'].bg; }
+    if(src){ if(cb) cb.value=src.bg; if(cf) cf.value=src.fg; if(pv) pv.style.background=src.bg; }
   }
 
   function setTheme(key){
@@ -468,6 +469,11 @@
     editingNow=false; canSaveNow=false; notifyState();
     render();
   }
+  function afterSave(){
+    flash('已保存');
+    editingNow=false; canSaveNow=false; notifyState();
+    render();
+  }
   function flash(msg){
     var s=document.getElementById('status');
     if(s){ s.innerText=msg; s.style.opacity=1; setTimeout(function(){ s.style.opacity=0; },1600); }
@@ -484,7 +490,7 @@
     if(!p) return;
     p.style.display=(p.style.display==='block')?'none':'block';
   }
-  window.enterEdit=enterEdit; window.cancelEdit=cancelEdit; window.save=save; window.togglePalette=togglePalette; window.cycleTheme=cycleTheme;
+  window.enterEdit=enterEdit; window.cancelEdit=cancelEdit; window.save=save; window.afterSave=afterSave; window.togglePalette=togglePalette; window.cycleTheme=cycleTheme;
 
   window.onload=function(){
     var raw = (typeof SETSB64!=='undefined' && SETSB64) ? deb64(SETSB64) : '';
