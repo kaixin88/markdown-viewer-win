@@ -21,10 +21,10 @@ namespace MarkdownViewer
         public void Log(string msg) { form.LogFromJs(msg); }
     }
 
-    public class MainForm : Form
+    public class MainForm : Form, IMessageFilter
     {
         // 版本标识：显示在标题栏，用来一眼确认跑的是不是最新构建
-        private const string VER = "v8";
+        private const string VER = "v9";
         // 模拟真实按键（--selftest 用）：走完整窗口消息流程，才能复现"焦点在 textarea"的场景
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
@@ -116,8 +116,32 @@ namespace MarkdownViewer
             browser.ObjectForScripting = new ScriptBridge(this);
             this.Controls.Add(browser);
 
+            // 关键：WebBrowser（IE 宿主）会在加速键阶段把 Ctrl+S 之类整条吞掉，
+            // 既不冒泡到 WinForms 的 ProcessCmdKey，也不派发到文档的 onkeydown。
+            // 唯一能抢在它前面的是消息泵级的 IMessageFilter（PreFilterMessage）。
+            Application.AddMessageFilter(this);
+
             LoadFile(currentFile);
             if (selfTest) RunSelfTest();
+        }
+
+        // 消息泵层拦截 Ctrl+S。这里是所有按键消息的最前端，早于 WebBrowser 的加速键处理，
+        // 也早于 ProcessCmdKey，所以不受 IE 吞键影响。只吃 Ctrl+S，其余按键原样放行。
+        public bool PreFilterMessage(ref Message m)
+        {
+            const int WM_KEYDOWN = 0x0100;
+            const int WM_SYSKEYDOWN = 0x0104;
+            if (m.Msg == WM_KEYDOWN || m.Msg == WM_SYSKEYDOWN)
+            {
+                int vk = m.WParam.ToInt32();
+                if (vk == VK_S && (Control.ModifierKeys & Keys.Control) == Keys.Control)
+                {
+                    Log("PreFilterMessage: 消息泵层捕获 Ctrl+S");
+                    SaveViaScript();
+                    return true;   // 吞掉，避免 IE 再把它当"保存网页"处理
+                }
+            }
+            return false;
         }
 
         // 页面通过 window.external.log 写进来的诊断信息，用来判断按键有没有到网页侧
@@ -528,11 +552,13 @@ namespace MarkdownViewer
             if (tsSave != null) tsSave.Enabled = !viewMode;
         }
 
-        // 全局 Ctrl+S：焦点在任意位置（含菜单栏）都能保存
+        // 第二层兜底：焦点在 WinForms 控件（菜单栏等）时，按键会正常走到这里。
+        // 焦点在 WebBrowser 内部时按键已被 IE 吞掉，走不到这里 —— 那条路由 PreFilterMessage 负责。
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             if (keyData == (Keys.Control | Keys.S))
             {
+                Log("ProcessCmdKey: 捕获 Ctrl+S");
                 SaveViaScript();
                 return true;
             }
