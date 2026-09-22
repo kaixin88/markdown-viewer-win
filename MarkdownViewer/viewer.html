@@ -49,12 +49,12 @@
   #empty h1{font-size:20px;font-weight:600}
 
   /* ===== 配色面板 ===== */
-  #palette{display:none;position:fixed;top:32px;right:12px;z-index:30;border:1px solid;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:12px;width:248px;font-size:13px;background:#DCE2F1;color:#1E293B}
+  #palette{display:none;position:fixed;top:32px;right:12px;z-index:30;border:1px solid #ccc;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:12px;width:262px;font-size:13px;background:#fff;color:#333}
   #palette .ptitle{font-weight:600;margin-bottom:8px}
   #palette #swatches{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
-  #palette .psec{border-top:1px solid #B9C4DC;padding-top:10px}
+  #palette .psec{border-top:1px solid #ddd;padding-top:10px}
   #palette .prow{margin-top:8px;line-height:2}
-  #palette input{width:84px;border:1px solid;border-radius:4px;padding:2px 4px;font-family:Consolas,monospace;background:#DCE2F1;color:#1E293B}
+  #palette input{width:84px;border:1px solid #bbb;border-radius:4px;padding:2px 4px;font-family:Consolas,monospace;background:#fff;color:#333}
   #palette #customPreview{display:inline-block;width:22px;height:22px;border:1px solid;vertical-align:middle;border-radius:4px}
   #palette #customMsg{margin-top:6px;color:#c33;min-height:14px}
 </style>
@@ -67,9 +67,9 @@
 <div id="view"></div>
 <textarea id="edit" spellcheck="false"></textarea>
 <div id="palette">
-  <div class="ptitle">阅读配色（点击色块切换）</div>
+  <div class="ptitle" id="ptitle">阅读配色（点击色块即可切换）</div>
   <div id="swatches"></div>
-  <div class="psec">自定义颜色</div>
+  <div class="psec">自定义颜色（输入后即时生效）</div>
   <div class="prow">
     背景 <input id="customBg" type="text" value="#FAF9F6">
     文字 <input id="customFg" type="text" value="#1A1A1A">
@@ -316,43 +316,69 @@
 
   function persist(o){ try{ if(window.external && window.external.saveSettings){ window.external.saveSettings(JSON.stringify(o)); } }catch(e){} }
 
+  function safeStyle(el, prop, val){ try{ if(el && el.style) el.style[prop]=val; }catch(e){} }
+
   function markActive(key){
     var box=document.getElementById('swatches'); if(!box) return;
     var nodes=box.childNodes;
     for(var i=0;i<nodes.length;i++){
       var n=nodes[i];
-      if(n && n.getAttribute && n.getAttribute('data-key')){
-        var on=(n.getAttribute('data-key')===key);
-        n.style.outline = on?'2px solid #0969da':'none';
-        n.style.outlineOffset='1px';
-      }
+      if(!n || !n.getAttribute) continue;
+      var k=null;
+      try{ k=n.getAttribute('data-key'); }catch(e){ k=null; }
+      if(!k) continue;
+      var on=(k===key);
+      safeStyle(n,'border', on?'2px solid #0969da':'1px solid #bbb');
+      safeStyle(n,'outline', on?'2px solid #0969da':'none');
+      safeStyle(n,'boxShadow', on?'0 0 0 2px rgba(9,105,218,.45)':'none');
     }
   }
 
   function updateThemeUI(){
     var key = document.documentElement.getAttribute('data-theme') || DEFAULT_THEME;
-    var b=document.getElementById('themeBtn');
-    if(b) b.innerText='配色：'+(PALETTES[key]?PALETTES[key].name:'默认');
-    markActive(key);
-    var src = (key==='custom' && PALETTES['custom']) ? PALETTES['custom'] : PALETTES[key];
+    var p = (key==='custom' && PALETTES['custom']) ? PALETTES['custom'] : PALETTES[key];
+    var label = (p && p.name) ? p.name : '默认';
+    // ★ 先同步自定义输入框与预览（这一步必须最先做：IE 下后面的样式写入可能抛错）
     var cb=document.getElementById('customBg'), cf=document.getElementById('customFg'), pv=document.getElementById('customPreview');
-    if(src){ if(cb) cb.value=src.bg; if(cf) cf.value=src.fg; if(pv) pv.style.background=src.bg; }
+    if(p){ if(cb) cb.value=p.bg; if(cf) cf.value=p.fg; if(pv) safeStyle(pv,'background',p.bg); }
+    var b=document.getElementById('themeBtn'); if(b) b.innerText='配色：'+label;
+    var t=document.getElementById('ptitle'); if(t) t.innerText='阅读配色（当前：'+label+'，点击色块即可切换）';
+    try{ if(window.external && window.external.setThemeName) window.external.setThemeName(label); }catch(e){}
+    markActive(key);
   }
 
   function setTheme(key){
     if(!PALETTES[key]) key = DEFAULT_THEME;
     injectTheme(key);
-    persist(key==='custom' ? {mode:'custom', bg:PALETTES[key].bg, fg:PALETTES[key].fg} : {mode:'preset', key:key});
+    var p = PALETTES[key];
+    persist(key==='custom' ? {mode:'custom', bg:p.bg, fg:p.fg} : {mode:'preset', key:key});
     updateThemeUI();
   }
 
+  // 应用自定义配色：内联写 body/html（最高优先级）→ 注入主题 → 读回校验，失败则重写样式表
   function applyCustom(bg, fg){
     bg = normHex(bg); fg = normHex(fg);
     if(!bg || !fg) return false;
     PALETTES['custom'] = derivePalette(bg, fg);
-    // 直接兜底写 body，确保自定义色立即生效，不被硬编码或旧样式覆盖
-    try{ document.body.style.backgroundColor=bg; document.body.style.color=fg; }catch(e){}
+    PALETTES['custom'].bg = bg;   // 记忆值始终等于用户输入
+    PALETTES['custom'].fg = fg;
+    try{
+      document.body.style.backgroundColor = bg;
+      document.body.style.color = fg;
+      document.documentElement.style.backgroundColor = bg;
+    }catch(e){}
     setTheme('custom');
+    // 读回校验：确认背景色真的生效，不生效就再直接写一次样式表
+    try{
+      var want = 'rgb(' + hexToRgb(bg).join(', ') + ')';
+      var actual = getComputedStyle(document.body).backgroundColor;
+      if(actual !== want){
+        var st = document.getElementById('theme');
+        if(st && st.styleSheet){ st.styleSheet.cssText = buildCSS(PALETTES['custom']); }
+        actual = getComputedStyle(document.body).backgroundColor;
+      }
+      flash('配色已应用：' + bg + ' / ' + fg);
+    }catch(e){}
     return true;
   }
 
@@ -477,11 +503,15 @@
     flash('已保存');
     try{ render(); }catch(e){ /* 渲染失败也不影响已保存的结果 */ }
   }
-  function afterSave(){
+  // saved：C# 写入磁盘的内容（由 C# 传入）。传了就以此为准刷新页面内容与视图，
+  // 否则页面仍会按旧的 content 变量渲染 —— 这正是"保存后看到的还是老内容"的原因。
+  function afterSave(saved){
+    if(typeof saved === 'string') content = saved;
     ensureViewMode();
     flash('已保存');
     try{ render(); }catch(e){}
   }
+  function afterSaveContent(saved){ afterSave(saved); }
   function flash(msg){
     var s=document.getElementById('status');
     if(s){ s.innerText=msg; s.style.opacity=1; setTimeout(function(){ s.style.opacity=0; },1600); }
@@ -498,44 +528,64 @@
     if(!p) return;
     p.style.display=(p.style.display==='block')?'none':'block';
   }
-  window.enterEdit=enterEdit; window.cancelEdit=cancelEdit; window.save=save; window.afterSave=afterSave; window.ensureViewMode=ensureViewMode; window.togglePalette=togglePalette; window.cycleTheme=cycleTheme;
+  window.enterEdit=enterEdit; window.cancelEdit=cancelEdit; window.save=save; window.afterSave=afterSave; window.afterSaveContent=afterSaveContent; window.ensureViewMode=ensureViewMode; window.togglePalette=togglePalette; window.cycleTheme=cycleTheme; window.applyCustom=applyCustom; window.setTheme=setTheme;
 
   window.onload=function(){
-    var raw = (typeof SETSB64!=='undefined' && SETSB64) ? deb64(SETSB64) : '';
-    var settings = {};
-    try{ if(raw) settings = JSON.parse(raw); }catch(e){ settings={}; }
-    initTheme(settings);
+    // 每一步独立防错：任何一步异常都不能影响后续初始化（IE 下尤其重要）
+    function step(fn){ try{ fn(); }catch(e){ try{ flash('初始化警告：'+(e.message||e)); }catch(e2){} } }
 
-    var meta=document.getElementById('meta');
-    if(meta) meta.innerText = name + (isMd?'  ·  Markdown' : ((LANG_BY_EXT[ext] && LANG_BY_EXT[ext]!=='_text')?('  ·  '+ext.toUpperCase()+' 代码'):'  ·  文本'));
+    step(function(){
+      var raw = (typeof SETSB64!=='undefined' && SETSB64) ? deb64(SETSB64) : '';
+      var settings = {};
+      try{ if(raw) settings = JSON.parse(raw); }catch(e){ settings={}; }
+      initTheme(settings);
+    });
 
-    render();
+    step(function(){
+      var meta=document.getElementById('meta');
+      if(meta) meta.innerText = name + (isMd?'  ·  Markdown' : ((LANG_BY_EXT[ext] && LANG_BY_EXT[ext]!=='_text')?('  ·  '+ext.toUpperCase()+' 代码'):'  ·  文本'));
+    });
 
-    var closeP=document.getElementById('closePalette');
-    if(closeP) closeP.onclick=function(){ document.getElementById('palette').style.display='none'; };
+    step(function(){ render(); });
 
-    var applyC=document.getElementById('applyCustom');
-    if(applyC) applyC.onclick=function(){
-      var bg=document.getElementById('customBg').value, fg=document.getElementById('customFg').value;
-      var msg=document.getElementById('customMsg');
-      if(!normHex(bg) || !normHex(fg)){ if(msg) msg.innerText='请输入 6 位十六进制颜色，如 #DCE2F1'; return; }
-      if(msg) msg.innerText='';
-      var ok=applyCustom(bg, fg);
-      if(ok){
-        document.getElementById('palette').style.display='none';
+    step(function(){
+      var closeP=document.getElementById('closePalette');
+      if(closeP) closeP.onclick=function(){ document.getElementById('palette').style.display='none'; };
+    });
+
+    step(function(){
+      var applyC=document.getElementById('applyCustom');
+      if(applyC) applyC.onclick=function(){
+        var bg=document.getElementById('customBg').value, fg=document.getElementById('customFg').value;
+        var msg=document.getElementById('customMsg');
+        if(!normHex(bg) || !normHex(fg)){ if(msg) msg.innerText='请输入 6 位十六进制颜色，如 #DCE2F1'; return; }
+        if(msg) msg.innerText='';
+        if(applyCustom(bg, fg)){ document.getElementById('palette').style.display='none'; }
+      };
+    });
+
+    step(function(){
+      var bgInput=document.getElementById('customBg'), fgInput=document.getElementById('customFg');
+      function liveApply(){
+        var pv=document.getElementById('customPreview');
+        var b=normHex(bgInput.value), f=normHex(fgInput.value);
+        if(pv && b) safeStyle(pv,'background',b);
+        var msg=document.getElementById('customMsg');
+        if(b && f){ if(msg) msg.innerText=''; applyCustom(b, f); }
+        else if(msg){ msg.innerText='颜色格式：#RRGGBB'; }
       }
-    };
+      if(bgInput){ bgInput.onkeyup=liveApply; bgInput.onchange=liveApply; bgInput.onblur=liveApply; }
+      if(fgInput){ fgInput.onkeyup=liveApply; fgInput.onchange=liveApply; fgInput.onblur=liveApply; }
+    });
 
-    var bgInput=document.getElementById('customBg'), fgInput=document.getElementById('customFg');
-    function livePreview(){ var pv=document.getElementById('customPreview'); if(!pv) return; var b=normHex(bgInput.value); if(b) pv.style.background=b; }
-    if(bgInput) bgInput.onkeyup=livePreview; if(fgInput) fgInput.onkeyup=livePreview;
+    step(function(){
+      var ta=document.getElementById('edit');
+      ta.onkeydown=function(e){
+        if((e.ctrlKey||e.metaKey) && (e.key==='s'||e.keyCode===83)){ if(e.preventDefault) e.preventDefault(); else e.returnValue=false; save(); }
+      };
+    });
 
-    var ta=document.getElementById('edit');
-    ta.onkeydown=function(e){
-      if((e.ctrlKey||e.metaKey) && (e.key==='s'||e.keyCode===83)){ if(e.preventDefault) e.preventDefault(); else e.returnValue=false; save(); }
-    };
-
-    notifyName();
+    step(function(){ notifyName(); });
   };
 
   buildSwatches();

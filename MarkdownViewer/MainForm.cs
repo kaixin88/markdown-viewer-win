@@ -17,6 +17,7 @@ namespace MarkdownViewer
         public void SaveSettings(string json) { form.SaveSettings(json); }
         public void SetEditState(bool editing, bool canSave) { form.SetEditState(editing, canSave); }
         public void SetFileName(string name) { form.SetFileName(name); }
+        public void SetThemeName(string name) { form.SetThemeName(name); }
     }
 
     public class MainForm : Form
@@ -26,6 +27,7 @@ namespace MarkdownViewer
         private string settingsJson = "";
         private ToolStripButton tsEdit;
         private ToolStripButton tsSave;
+        private ToolStripButton tsTheme;
         private ToolStripLabel tsName;
 
         public MainForm(string file)
@@ -50,7 +52,7 @@ namespace MarkdownViewer
             tsName = new ToolStripLabel("未命名") { Overflow = ToolStripItemOverflow.Never };
             tsEdit = new ToolStripButton("编辑") { Overflow = ToolStripItemOverflow.Never };
             tsSave = new ToolStripButton("保存") { Overflow = ToolStripItemOverflow.Never, Enabled = false };
-            var tsTheme = new ToolStripButton("配色") { Overflow = ToolStripItemOverflow.Never };
+            tsTheme = new ToolStripButton("配色") { Overflow = ToolStripItemOverflow.Never };
 
             tsEdit.Click += (s, e) =>
             {
@@ -132,6 +134,12 @@ namespace MarkdownViewer
             if (tsName != null) tsName.Text = string.IsNullOrEmpty(name) ? "未命名" : name;
         }
 
+        // 页面把当前生效的配色名同步到工具栏，方便一眼确认配色是否真的切换了
+        public void SetThemeName(string name)
+        {
+            if (tsTheme != null && !string.IsNullOrEmpty(name)) tsTheme.Text = "配色：" + name;
+        }
+
         private string SettingsPath()
         {
             string dir = Path.Combine(
@@ -178,13 +186,15 @@ namespace MarkdownViewer
         }
 
         // 统一保存入口（按钮 / Ctrl+S 共用）：
-        // 主路径 = C# 直读 textarea 的实时值（DomElement.value，等价于 JS 的 ta.value）
-        //          → 直接写盘 → InvokeScript("afterSave") 让页面回查看态并重新渲染。
-        // 备用路径 = 页面 JS 的 save()（走 external.saveFile）。
-        // 注意：绝不能用 HTMLElement.GetAttribute("value") 读 textarea——
-        //       IE/MSHTML 下它返回的是初始内容而非当前编辑，会把旧内容写回文件。
+        // 1) C# 直读 textarea 实时值（DomElement.value，等价 JS 的 ta.value）并写盘；
+        // 2) 把写入磁盘的内容回传给页面（afterSaveContent），让页面刷新为最新内容并退出编辑态；
+        //    这一步用 BeginInvoke 延迟到当前按键/点击消息处理结束之后再执行，
+        //    避免在 ProcessCmdKey 上下文里重入 IE 脚本引擎导致 InvokeScript 失效。
+        // 不可使用 HTMLElement.GetAttribute("value") 读 textarea：
+        //    IE/MSHTML 下它返回的是初始内容而非当前编辑，会把旧内容写回文件。
         private void SaveViaScript()
         {
+            string content = null;
             bool saved = false;
             try
             {
@@ -193,11 +203,10 @@ namespace MarkdownViewer
                 if (ta != null && ta.DomElement != null)
                 {
                     dynamic dom = ta.DomElement;
-                    string content = (string)dom.value;
+                    content = (string)dom.value;
                     if (content == null) content = "";
                     SaveCurrentFile(content);
                     saved = true;
-                    try { doc.InvokeScript("afterSave"); } catch { }
                 }
             }
             catch (Exception ex)
@@ -205,11 +214,26 @@ namespace MarkdownViewer
                 if (!saved) MessageBox.Show("保存失败：" + ex.Message, "保存",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
-            if (!saved)
+
+            if (saved)
+            {
+                string payload = content;
+                try
+                {
+                    this.BeginInvoke(new Action(() =>
+                    {
+                        try { browser.Document.InvokeScript("afterSaveContent", new object[] { payload }); }
+                        catch { try { browser.Document.InvokeScript("afterSave"); } catch { } }
+                    }));
+                }
+                catch { }
+            }
+            else
             {
                 // C# 直读失败才走页面 JS 兜底
                 try { browser.Document?.InvokeScript("save"); } catch { }
             }
+
             if (tsEdit != null) tsEdit.Text = "编辑";
             if (tsSave != null) tsSave.Enabled = false;
         }
