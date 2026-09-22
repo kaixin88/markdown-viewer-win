@@ -24,7 +24,7 @@ namespace MarkdownViewer
     public class MainForm : Form, IMessageFilter
     {
         // 版本标识：显示在标题栏，用来一眼确认跑的是不是最新构建
-        private const string VER = "v10";
+        private const string VER = "v11";
         // 自检用：把按键消息直接投递到 IE 子窗口，不依赖前台焦点（keybd_event 在无焦点时会送丢）
         [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
         private static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string lpszClass, string lpszWindow);
@@ -137,8 +137,19 @@ namespace MarkdownViewer
         // Ctrl 状态自己跟踪：Control.ModifierKeys 在 PostMessage / 无前台焦点时不可靠。
         public bool PreFilterMessage(ref Message m)
         {
-            int vk = m.WParam.ToInt32();
-            if (m.Msg == WM_KEYDOWN || m.Msg == 0x0104 /*WM_SYSKEYDOWN*/)
+            // 只关心键盘按下/抬起，其余消息原样放行。
+            // 注意 WParam 是 IntPtr：64 位下某些消息的值会超出 int 范围，
+            // 必须先按 long 取并校验范围，否则 ToInt32() 会抛 OverflowException 把程序打崩。
+            if (m.Msg != WM_KEYDOWN && m.Msg != WM_KEYUP
+                && m.Msg != 0x0104 /*WM_SYSKEYDOWN*/ && m.Msg != 0x0105 /*WM_SYSKEYUP*/)
+                return false;
+
+            long wp = m.WParam.ToInt64();
+            if (wp < 0 || wp > 0xFF) return false;   // 键盘消息的 wParam 只可能是 0..255
+            int vk = (int)wp;
+            bool isDown = (m.Msg == WM_KEYDOWN || m.Msg == 0x0104);
+
+            if (isDown)
             {
                 if (vk == VK_CONTROL_ || vk == VK_LCONTROL || vk == VK_RCONTROL)
                 {
@@ -156,7 +167,7 @@ namespace MarkdownViewer
                     }
                 }
             }
-            else if (m.Msg == WM_KEYUP || m.Msg == 0x0105 /*WM_SYSKEYUP*/)
+            else
             {
                 if (vk == VK_CONTROL_ || vk == VK_LCONTROL || vk == VK_RCONTROL) ctrlDown = false;
             }
