@@ -2,3 +2,9 @@ bin/
 obj/
 .vs/
 *.user
+
+# 本地调试脚本，不进版本库
+app_probe.js
+probe_test.js
+build_probe.js
+push.js

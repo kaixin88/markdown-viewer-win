@@ -185,13 +185,14 @@ namespace MarkdownViewer
             }
         }
 
-        // 统一保存入口（按钮 / Ctrl+S 共用）：
-        // 1) C# 直读 textarea 实时值（DomElement.value，等价 JS 的 ta.value）并写盘；
-        // 2) 把写入磁盘的内容回传给页面（afterSaveContent），让页面刷新为最新内容并退出编辑态；
-        //    这一步用 BeginInvoke 延迟到当前按键/点击消息处理结束之后再执行，
-        //    避免在 ProcessCmdKey 上下文里重入 IE 脚本引擎导致 InvokeScript 失效。
-        // 不可使用 HTMLElement.GetAttribute("value") 读 textarea：
-        //    IE/MSHTML 下它返回的是初始内容而非当前编辑，会把旧内容写回文件。
+        // 统一保存入口（工具栏「保存」按钮 / Ctrl+S 共用）。
+        // IE/MSHTML 下的两条硬约束决定了这里的写法：
+        //  1) 在按键消息上下文里调用 InvokeScript 会因脚本引擎重入而静默失效。
+        //     这正是「Ctrl+S 能保存、但界面仍停在编辑态」的根因：写盘靠 C#（能成功），
+        //     而退出编辑态原来依赖的 afterSaveContent 脚本回调被吞掉了。
+        //     所以关键路径只用 IDispatch 调 DOM（读值 / 改 style / blur），不调脚本。
+        //  2) HTMLElement.GetAttribute("value") 读 textarea 返回的是初始内容，
+        //     会把旧内容写回文件 —— 必须走 DomElement.value（等价 JS 的 ta.value）。
         private void SaveViaScript()
         {
             string content = null;
@@ -205,8 +206,9 @@ namespace MarkdownViewer
                     dynamic dom = ta.DomElement;
                     content = (string)dom.value;
                     if (content == null) content = "";
-                    SaveCurrentFile(content);
+                    SaveCurrentFile(content);   // 只写盘，绝不回头调脚本
                     saved = true;
+                    ExitEditByDom(ta);          // 纯 IDispatch：当场退出编辑态
                 }
             }
             catch (Exception ex)
@@ -217,25 +219,74 @@ namespace MarkdownViewer
 
             if (saved)
             {
-                string payload = content;
-                try
-                {
-                    this.BeginInvoke(new Action(() =>
-                    {
-                        try { browser.Document.InvokeScript("afterSaveContent", new object[] { payload }); }
-                        catch { try { browser.Document.InvokeScript("afterSave"); } catch { } }
-                    }));
-                }
-                catch { }
+                // 正文重新渲染必须由脚本引擎完成，改到按键上下文之外再用定时器触发
+                RefreshViewLater();
             }
             else
             {
-                // C# 直读失败才走页面 JS 兜底
+                // 拿不到编辑框（页面未就绪等）才退化为让页面自己走一遍保存
                 try { browser.Document?.InvokeScript("save"); } catch { }
             }
 
-            if (tsEdit != null) tsEdit.Text = "编辑";
-            if (tsSave != null) tsSave.Enabled = false;
+            SyncToolbar(true);
+        }
+
+        // 直接操作 DOM 退出编辑态。全部是 IDispatch 属性/方法调用，不经过脚本引擎，
+        // 因此在 ProcessCmdKey 的按键上下文里同样可靠。
+        private void ExitEditByDom(HtmlElement ta)
+        {
+            try
+            {
+                dynamic d = ta.DomElement;
+                try { d.blur(); } catch { }
+                dynamic ds = d.style;
+                ds.display = "none";
+
+                var doc = browser.Document;
+                var view = doc != null ? doc.GetElementById("view") : null;
+                if (view != null && view.DomElement != null)
+                {
+                    dynamic vd = view.DomElement;
+                    dynamic vs = vd.style;
+                    vs.display = "block";
+                }
+                // 焦点移出已隐藏的编辑框，避免后续按键继续落到不可见的 textarea
+                try { browser.Focus(); } catch { }
+            }
+            catch { }
+        }
+
+        // 延迟到当前按键/点击消息处理完毕后再让页面重新渲染最新内容。
+        // 不传参：页面自己从 textarea 取内容，避免长字符串跨语言编组失败
+        //（IE 下 InvokeScript 传长参数不可靠）。脚本调用仍失败时用整页重载兜底 ——
+        // 此时文件早已写盘，重载必然得到最新内容与阅读态。
+        private void RefreshViewLater()
+        {
+            var t = new Timer();
+            t.Interval = 60;
+            t.Tick += (s, e) =>
+            {
+                t.Stop();
+                t.Dispose();
+                bool ok = false;
+                try
+                {
+                    browser.Document.InvokeScript("afterSaveFromEdit");
+                    ok = true;
+                }
+                catch { ok = false; }
+                if (!ok)
+                {
+                    try { LoadFile(currentFile); } catch { }
+                }
+            };
+            t.Start();
+        }
+
+        private void SyncToolbar(bool viewMode)
+        {
+            if (tsEdit != null) tsEdit.Text = viewMode ? "编辑" : "取消";
+            if (tsSave != null) tsSave.Enabled = !viewMode;
         }
 
         // 全局 Ctrl+S：焦点在任意位置（含菜单栏）都能保存

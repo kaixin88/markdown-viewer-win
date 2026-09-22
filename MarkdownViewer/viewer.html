@@ -512,6 +512,17 @@
     try{ render(); }catch(e){}
   }
   function afterSaveContent(saved){ afterSave(saved); }
+  // C# 侧保存完成后触发（无参）。直接从编辑框取最新内容刷新渲染，
+  // 不依赖跨语言传参 —— IE 下 InvokeScript 传长字符串不可靠。
+  function afterSaveFromEdit(){
+    try{
+      var ta=document.getElementById('edit');
+      if(ta && typeof ta.value==='string') content=ta.value;
+    }catch(e){}
+    ensureViewMode();
+    flash('已保存');
+    try{ render(); }catch(e){}
+  }
   function flash(msg){
     var s=document.getElementById('status');
     if(s){ s.innerText=msg; s.style.opacity=1; setTimeout(function(){ s.style.opacity=0; },1600); }
@@ -528,7 +539,7 @@
     if(!p) return;
     p.style.display=(p.style.display==='block')?'none':'block';
   }
-  window.enterEdit=enterEdit; window.cancelEdit=cancelEdit; window.save=save; window.afterSave=afterSave; window.afterSaveContent=afterSaveContent; window.ensureViewMode=ensureViewMode; window.togglePalette=togglePalette; window.cycleTheme=cycleTheme; window.applyCustom=applyCustom; window.setTheme=setTheme;
+  window.enterEdit=enterEdit; window.cancelEdit=cancelEdit; window.save=save; window.afterSave=afterSave; window.afterSaveContent=afterSaveContent; window.afterSaveFromEdit=afterSaveFromEdit; window.ensureViewMode=ensureViewMode; window.togglePalette=togglePalette; window.cycleTheme=cycleTheme; window.applyCustom=applyCustom; window.setTheme=setTheme;
 
   window.onload=function(){
     // 每一步独立防错：任何一步异常都不能影响后续初始化（IE 下尤其重要）
