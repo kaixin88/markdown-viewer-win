@@ -185,7 +185,13 @@ namespace MarkdownViewer
             try
             {
                 var doc = browser.Document;
-                if (doc != null) { doc.InvokeScript("save"); done = true; }
+                if (doc != null)
+                {
+                    doc.InvokeScript("save");
+                    done = true;
+                    // 兜底：确保保存后一定回到查看界面（幂等，防止渲染异常停留在编辑态）
+                    try { doc.InvokeScript("ensureViewMode"); } catch { }
+                }
             }
             catch { }
             if (!done)

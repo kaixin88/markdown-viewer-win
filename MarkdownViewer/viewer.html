@@ -458,21 +458,30 @@
     document.getElementById('view').style.display='block';
     editingNow=false; canSaveNow=false; notifyState();
   }
+  // 强制回到阅读态：极简、不依赖渲染成功，保存后任何情况都退出编辑
+  function ensureViewMode(){
+    var ta=document.getElementById('edit');
+    if(ta){ ta.style.display='none'; }
+    var view=document.getElementById('view');
+    if(view){ view.style.display='block'; }
+    editingNow=false; canSaveNow=false; notifyState();
+  }
   function save(){
     var ta=document.getElementById('edit');
     if(ta.style.display==='none') return;
     content=ta.value;
     if(window.external && window.external.saveFile){
-      try{ window.external.saveFile(content); flash('已保存'); }
+      try{ window.external.saveFile(content); }
       catch(e){ flash('保存失败：'+e.message); return; }
     }
-    editingNow=false; canSaveNow=false; notifyState();
-    render();
+    ensureViewMode();   // 先确保切回查看界面（即使后续渲染失败也不停在编辑态）
+    render();           // 再按新内容重新渲染
+    flash('已保存');
   }
   function afterSave(){
-    flash('已保存');
-    editingNow=false; canSaveNow=false; notifyState();
+    ensureViewMode();
     render();
+    flash('已保存');
   }
   function flash(msg){
     var s=document.getElementById('status');
@@ -490,7 +499,7 @@
     if(!p) return;
     p.style.display=(p.style.display==='block')?'none':'block';
   }
-  window.enterEdit=enterEdit; window.cancelEdit=cancelEdit; window.save=save; window.afterSave=afterSave; window.togglePalette=togglePalette; window.cycleTheme=cycleTheme;
+  window.enterEdit=enterEdit; window.cancelEdit=cancelEdit; window.save=save; window.afterSave=afterSave; window.ensureViewMode=ensureViewMode; window.togglePalette=togglePalette; window.cycleTheme=cycleTheme;
 
   window.onload=function(){
     var raw = (typeof SETSB64!=='undefined' && SETSB64) ? deb64(SETSB64) : '';
