@@ -221,14 +221,15 @@ namespace MarkdownViewer
             {
                 // 正文重新渲染必须由脚本引擎完成，改到按键上下文之外再用定时器触发
                 RefreshViewLater();
+                // 仅在确认写盘成功后复位工具栏，与页面的阅读态保持一致
+                SyncToolbar(true);
             }
             else
             {
-                // 拿不到编辑框（页面未就绪等）才退化为让页面自己走一遍保存
+                // 拿不到编辑框（页面未就绪等）才退化为让页面自己走一遍保存；
+                // 此时工具栏状态由页面 notifyState 回传，避免和页面的编辑态对不上
                 try { browser.Document?.InvokeScript("save"); } catch { }
             }
-
-            SyncToolbar(true);
         }
 
         // 直接操作 DOM 退出编辑态。全部是 IDispatch 属性/方法调用，不经过脚本引擎，
