@@ -21,11 +21,16 @@ namespace MarkdownViewer
             catch { }
 
             string file = null;
+            string logPath = null;
+            bool selfTest = false;
             if (args != null)
             {
                 foreach (var a in args)
                 {
-                    if (string.IsNullOrEmpty(a) || a.StartsWith("-")) continue;
+                    if (string.IsNullOrEmpty(a)) continue;
+                    if (a == "--selftest") { selfTest = true; continue; }
+                    if (a.StartsWith("--log=")) { logPath = a.Substring(6); continue; }
+                    if (a.StartsWith("-")) continue;
                     if (System.IO.File.Exists(a))
                     {
                         file = a;
@@ -33,10 +38,14 @@ namespace MarkdownViewer
                     }
                 }
             }
+            if (selfTest && string.IsNullOrEmpty(logPath))
+            {
+                logPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "mdviewer-selftest.log");
+            }
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm(file));
+            Application.Run(new MainForm(file, logPath, selfTest));
         }
     }
 }

@@ -22,6 +22,8 @@ namespace MarkdownViewer
 
     public class MainForm : Form
     {
+        // 版本标识：显示在标题栏，用来一眼确认跑的是不是最新构建
+        private const string VER = "v7";
         private WebBrowser browser;
         private string currentFile;
         private string settingsJson = "";
@@ -29,13 +31,17 @@ namespace MarkdownViewer
         private ToolStripButton tsSave;
         private ToolStripButton tsTheme;
         private ToolStripLabel tsName;
+        private string logPath;      // 仅 --selftest / 显式指定时非空，正常运行不产生日志文件
 
-        public MainForm(string file)
+        public MainForm(string file) : this(file, null, false) { }
+
+        public MainForm(string file, string logPath, bool selfTest)
         {
+            this.logPath = logPath;
             SetBrowserEmulation();
             currentFile = file;
             settingsJson = LoadSettings();
-            this.Text = "文件查看器";
+            this.Text = "文件查看器 " + VER;
             this.Width = 980;
             this.Height = 740;
 
@@ -93,6 +99,18 @@ namespace MarkdownViewer
             this.Controls.Add(browser);
 
             LoadFile(currentFile);
+            if (selfTest) RunSelfTest();
+        }
+
+        private void Log(string msg)
+        {
+            if (string.IsNullOrEmpty(logPath)) return;
+            try
+            {
+                File.AppendAllText(logPath,
+                    DateTime.Now.ToString("HH:mm:ss.fff") + "  " + msg + "\r\n", Encoding.UTF8);
+            }
+            catch { }
         }
 
 
@@ -186,21 +204,23 @@ namespace MarkdownViewer
         }
 
         // 统一保存入口（工具栏「保存」按钮 / Ctrl+S 共用）。
-        // IE/MSHTML 下的两条硬约束决定了这里的写法：
-        //  1) 在按键消息上下文里调用 InvokeScript 会因脚本引擎重入而静默失效。
-        //     这正是「Ctrl+S 能保存、但界面仍停在编辑态」的根因：写盘靠 C#（能成功），
-        //     而退出编辑态原来依赖的 afterSaveContent 脚本回调被吞掉了。
-        //     所以关键路径只用 IDispatch 调 DOM（读值 / 改 style / blur），不调脚本。
-        //  2) HTMLElement.GetAttribute("value") 读 textarea 返回的是初始内容，
-        //     会把旧内容写回文件 —— 必须走 DomElement.value（等价 JS 的 ta.value）。
+        // IE/MSHTML 下的硬约束：
+        //  1) 在按键消息上下文（ProcessCmdKey）里调用 InvokeScript 会被脚本引擎重入吞掉，
+        //     所以「退出编辑态」不能依赖 C# 回调页面 JS。
+        //  2) HTMLElement.GetAttribute("value") 读 textarea 返回初始内容，必须走 DomElement.value。
+        // 退出编辑态采用两级策略：
+        //   A. 首选纯 IDispatch 改写内联 style（读回校验，确认真的生效）；
+        //   B. A 不生效时直接整页重载 —— 文件已写盘，重载后必然是阅读态 + 最新内容。
+        //      B 这条路完全不碰脚本引擎，物理上必然有效，是兜底保证。
         private void SaveViaScript()
         {
             string content = null;
             bool saved = false;
+            HtmlElement ta = null;
             try
             {
                 var doc = browser.Document;
-                var ta = doc != null ? doc.GetElementById("edit") : null;
+                ta = doc != null ? doc.GetElementById("edit") : null;
                 if (ta != null && ta.DomElement != null)
                 {
                     dynamic dom = ta.DomElement;
@@ -208,21 +228,38 @@ namespace MarkdownViewer
                     if (content == null) content = "";
                     SaveCurrentFile(content);   // 只写盘，绝不回头调脚本
                     saved = true;
-                    ExitEditByDom(ta);          // 纯 IDispatch：当场退出编辑态
+                    Log("SaveViaScript: 已写盘 " + content.Length + " 字符 -> " + currentFile);
+                }
+                else
+                {
+                    Log("SaveViaScript: 拿不到 #edit 元素（doc=" + (doc != null) + "）");
                 }
             }
             catch (Exception ex)
             {
+                Log("SaveViaScript: 读值写盘异常 " + ex.GetType().Name + " " + ex.Message);
                 if (!saved) MessageBox.Show("保存失败：" + ex.Message, "保存",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
 
             if (saved)
             {
-                // 正文重新渲染必须由脚本引擎完成，改到按键上下文之外再用定时器触发
-                RefreshViewLater();
-                // 仅在确认写盘成功后复位工具栏，与页面的阅读态保持一致
                 SyncToolbar(true);
+                bool uiOk = TryExitEditByDom(ta);
+                if (uiOk)
+                {
+                    Log("SaveViaScript: IDispatch 退出编辑态成功，稍后刷新正文");
+                    RefreshViewLater();
+                }
+                else
+                {
+                    // IDispatch 没生效：延迟整页重载。不依赖 IDispatch / 脚本引擎任何一环，
+                    // 文件已写盘 -> 重载后必然是新内容 + 阅读态。
+                    Log("SaveViaScript: IDispatch 未生效 -> 延迟整页重载兜底");
+                    ReloadLater(0);
+                }
+                // 事后复查（最后一根保险丝）：此刻页面若还没回到阅读态，强制重载
+                VerifyViewModeLater();
             }
             else
             {
@@ -232,16 +269,23 @@ namespace MarkdownViewer
             }
         }
 
-        // 直接操作 DOM 退出编辑态。全部是 IDispatch 属性/方法调用，不经过脚本引擎，
-        // 因此在 ProcessCmdKey 的按键上下文里同样可靠。
-        private void ExitEditByDom(HtmlElement ta)
+        // 直接操作 DOM 退出编辑态，返回是否【确认生效】（写入后读回校验）。
+        // 全部是 IDispatch 属性/方法调用，不经过脚本引擎。
+        private bool TryExitEditByDom(HtmlElement ta)
         {
             try
             {
                 dynamic d = ta.DomElement;
                 try { d.blur(); } catch { }
+
                 dynamic ds = d.style;
                 ds.display = "none";
+
+                string back = null;
+                try { back = (string)ds.display; } catch { }
+                bool ok = string.Equals(back, "none", StringComparison.OrdinalIgnoreCase);
+                Log("  edit.style.display 写后读回 = '" + back + "' -> " + (ok ? "已生效" : "未生效"));
+                if (!ok) return false;
 
                 var doc = browser.Document;
                 var view = doc != null ? doc.GetElementById("view") : null;
@@ -250,17 +294,23 @@ namespace MarkdownViewer
                     dynamic vd = view.DomElement;
                     dynamic vs = vd.style;
                     vs.display = "block";
+                    string vback = null;
+                    try { vback = (string)vs.display; } catch { }
+                    Log("  view.style.display 写后读回 = '" + vback + "'");
                 }
                 // 焦点移出已隐藏的编辑框，避免后续按键继续落到不可见的 textarea
                 try { browser.Focus(); } catch { }
+                return true;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Log("  TryExitEditByDom 异常: " + ex.GetType().Name + " " + ex.Message);
+                return false;
+            }
         }
 
         // 延迟到当前按键/点击消息处理完毕后再让页面重新渲染最新内容。
-        // 不传参：页面自己从 textarea 取内容，避免长字符串跨语言编组失败
-        //（IE 下 InvokeScript 传长参数不可靠）。脚本调用仍失败时用整页重载兜底 ——
-        // 此时文件早已写盘，重载必然得到最新内容与阅读态。
+        // 不传参：页面自己从 textarea 取内容，避免长字符串跨语言编组失败（IE 下不可靠）。
         private void RefreshViewLater()
         {
             var t = new Timer();
@@ -269,16 +319,149 @@ namespace MarkdownViewer
             {
                 t.Stop();
                 t.Dispose();
-                bool ok = false;
                 try
                 {
                     browser.Document.InvokeScript("afterSaveFromEdit");
-                    ok = true;
+                    Log("  afterSaveFromEdit 已调用");
                 }
-                catch { ok = false; }
-                if (!ok)
+                catch (Exception ex)
                 {
-                    try { LoadFile(currentFile); } catch { }
+                    Log("  afterSaveFromEdit 失败(" + ex.Message + ") -> 整页重载");
+                    ReloadLater(0);
+                }
+            };
+            t.Start();
+        }
+
+        // 延迟整页重载（BeginInvoke = 等当前按键/点击消息处理完毕再执行）。
+        // DocumentText 赋值走 MSHTML 解析器、不涉及脚本引擎重入，延迟执行再加一道保险。
+        private void ReloadLater(int delayMs)
+        {
+            Action act = () =>
+            {
+                Log("  ReloadLater: 重载页面 " + currentFile);
+                try { LoadFile(currentFile); }
+                catch (Exception ex) { Log("  重载失败: " + ex.Message); }
+            };
+            if (delayMs <= 0)
+            {
+                try { this.BeginInvoke(act); } catch { try { act(); } catch { } }
+            }
+            else
+            {
+                var t = new Timer();
+                t.Interval = delayMs;
+                t.Tick += (s, e) => { t.Stop(); t.Dispose(); act(); };
+                t.Start();
+            }
+        }
+
+        // 读 #edit 的内联 display（纯 IDispatch，不碰脚本引擎）
+        private string ReadEditDisplay()
+        {
+            try
+            {
+                var doc = browser.Document;
+                var ta = doc != null ? doc.GetElementById("edit") : null;
+                if (ta == null || ta.DomElement == null) return "<无#edit>";
+                dynamic d = ta.DomElement;
+                dynamic ds = d.style;
+                return (string)ds.display;
+            }
+            catch (Exception ex) { return "<异常:" + ex.Message + ">"; }
+        }
+
+        // 保存后复查（最后一根保险丝）：编辑框还没隐藏，说明前两步都没生效，强制重载
+        private void VerifyViewModeLater()
+        {
+            var t = new Timer();
+            t.Interval = 700;
+            t.Tick += (s, e) =>
+            {
+                t.Stop();
+                t.Dispose();
+                string disp = ReadEditDisplay();
+                bool hidden = string.Equals(disp, "none", StringComparison.OrdinalIgnoreCase);
+                Log("  复查 edit.display = '" + disp + "' -> " + (hidden ? "已是阅读态" : "仍在编辑态"));
+                if (!hidden)
+                {
+                    Log("  复查发现仍在编辑态 -> 强制重载");
+                    ReloadLater(0);
+                }
+            };
+            t.Start();
+        }
+
+        // ===== 自检（--selftest）：不依赖任何 UI 交互，自动复现「编辑 -> Ctrl+S」并记录每一步结果 =====
+        private void RunSelfTest()
+        {
+            var t = new Timer();
+            t.Interval = 1500;
+            t.Tick += (s, e) =>
+            {
+                t.Stop();
+                t.Dispose();
+                Log("=== selftest start ===");
+                try
+                {
+                    var doc = browser.Document;
+                    var ta = doc != null ? doc.GetElementById("edit") : null;
+                    Log("document=" + (doc != null) + "  #edit=" + (ta != null) + "  DomElement=" + (ta != null && ta.DomElement != null));
+                    if (ta == null) { Log("=== selftest end (无编辑框) ==="); Application.Exit(); return; }
+
+                    doc.InvokeScript("enterEdit");
+                    dynamic editDom = ta.DomElement;   // 必须先落到 dynamic 变量，才能访问 .style
+                    dynamic editStyle = editDom.style;
+                    Log("enterEdit 后 edit.display = '" + (string)editStyle.display + "'");
+
+                    dynamic d = ta.DomElement;
+                    d.value = "SELFTEST-NEW-CONTENT\r\nsecond line";
+                    Log("已写入编辑框新内容");
+
+                    // 用真正的快捷键入口调用，完整复现用户场景
+                    Message m = new Message();
+                    bool handled = ProcessCmdKey(ref m, Keys.Control | Keys.S);
+                    Log("ProcessCmdKey(Ctrl+S) 返回 " + handled);
+
+                    var t2 = new Timer();
+                    t2.Interval = 1500;
+                    t2.Tick += (s2, e2) =>
+                    {
+                        t2.Stop();
+                        t2.Dispose();
+                        try
+                        {
+                            var doc2 = browser.Document;
+                            string e1 = "?", v1 = "?";
+                            var ed = doc2.GetElementById("edit");
+                            if (ed != null && ed.DomElement != null)
+                            {
+                                dynamic edd = ed.DomElement;
+                                dynamic eds = edd.style;
+                                try { e1 = (string)eds.display; } catch { }
+                            }
+                            var vw = doc2.GetElementById("view");
+                            if (vw != null && vw.DomElement != null)
+                            {
+                                dynamic vwd = vw.DomElement;
+                                dynamic vws = vwd.style;
+                                try { v1 = (string)vws.display; } catch { }
+                            }
+                            Log("结果 edit.display='" + e1 + "'  view.display='" + v1 + "'");
+                            string onDisk = File.Exists(currentFile) ? File.ReadAllText(currentFile, Encoding.UTF8) : "<不存在>";
+                            Log("磁盘内容 = " + onDisk.Replace("\r", "\\r").Replace("\n", "\\n"));
+                        }
+                        catch (Exception ex3) { Log("结果检查异常: " + ex3.Message); }
+                        Log("=== selftest end ===");
+                        Application.Exit();
+                    };
+                    t2.Start();
+                }
+                catch (Exception ex)
+                {
+                    Log("selftest 异常: " + ex.GetType().Name + " " + ex.Message);
+                    Log("=== selftest end (异常) ===");
+                    Application.Exit();
                 }
             };
             t.Start();
@@ -323,7 +506,7 @@ namespace MarkdownViewer
                     text = File.ReadAllText(path, Encoding.UTF8);
                     ext = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
                     name = Path.GetFileName(path);
-                    this.Text = "文件查看器 — " + name;
+                    this.Text = "文件查看器 " + VER + " — " + name;
                     if (tsName != null) tsName.Text = name;
                 }
                 else
