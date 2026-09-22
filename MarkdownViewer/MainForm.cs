@@ -67,7 +67,7 @@ namespace MarkdownViewer
                     tsSave.Enabled = false;
                 }
             };
-            tsSave.Click += (s, e) => SaveFromEditor();
+            tsSave.Click += (s, e) => SaveViaScript();
             tsTheme.Click += (s, e) => browser.Document?.InvokeScript("togglePalette");
 
             menu.Items.Add(fileMenu);
@@ -177,22 +177,34 @@ namespace MarkdownViewer
             }
         }
 
-        // 从 WebBrowser 内的编辑框直接取内容写盘，不依赖 JS 桥接状态
-        private void SaveFromEditor()
+        // 统一保存入口：走网页 JS 的 save()（用编辑框运行时值，内容永远是最新的）。
+        // 不用 GetAttribute("value") 取 textarea——IE 内核下它返回的是文件初始内容而非当前编辑。
+        private void SaveViaScript()
         {
+            bool done = false;
             try
             {
                 var doc = browser.Document;
-                var ta = doc != null ? doc.GetElementById("edit") : null;
-                if (ta == null) return;
-                string content = ta.GetAttribute("value");
-                if (content == null) content = "";
-                SaveCurrentFile(content);
-                try { doc.InvokeScript("afterSave"); } catch { }
-                if (tsEdit != null) tsEdit.Text = "编辑";
-                if (tsSave != null) tsSave.Enabled = false;
+                if (doc != null) { doc.InvokeScript("save"); done = true; }
             }
             catch { }
+            if (!done)
+            {
+                // JS 路径失败才回退：直取编辑框内容写盘
+                try
+                {
+                    var doc = browser.Document;
+                    var ta = doc != null ? doc.GetElementById("edit") : null;
+                    if (ta == null) return;
+                    string content = ta.GetAttribute("value");
+                    if (content == null) content = "";
+                    SaveCurrentFile(content);
+                    try { doc.InvokeScript("afterSave"); } catch { }
+                }
+                catch { }
+            }
+            if (tsEdit != null) tsEdit.Text = "编辑";
+            if (tsSave != null) tsSave.Enabled = false;
         }
 
         // 全局 Ctrl+S：焦点在任意位置（含菜单栏）都能保存
@@ -200,7 +212,7 @@ namespace MarkdownViewer
         {
             if (keyData == (Keys.Control | Keys.S))
             {
-                SaveFromEditor();
+                SaveViaScript();
                 return true;
             }
             return base.ProcessCmdKey(ref msg, keyData);
