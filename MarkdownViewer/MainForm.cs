@@ -177,37 +177,38 @@ namespace MarkdownViewer
             }
         }
 
-        // 统一保存入口：走网页 JS 的 save()（用编辑框运行时值，内容永远是最新的）。
-        // 不用 GetAttribute("value") 取 textarea——IE 内核下它返回的是文件初始内容而非当前编辑。
+        // 统一保存入口（按钮 / Ctrl+S 共用）：
+        // 主路径 = C# 直读 textarea 的实时值（DomElement.value，等价于 JS 的 ta.value）
+        //          → 直接写盘 → InvokeScript("afterSave") 让页面回查看态并重新渲染。
+        // 备用路径 = 页面 JS 的 save()（走 external.saveFile）。
+        // 注意：绝不能用 HTMLElement.GetAttribute("value") 读 textarea——
+        //       IE/MSHTML 下它返回的是初始内容而非当前编辑，会把旧内容写回文件。
         private void SaveViaScript()
         {
-            bool done = false;
+            bool saved = false;
             try
             {
                 var doc = browser.Document;
-                if (doc != null)
+                var ta = doc != null ? doc.GetElementById("edit") : null;
+                if (ta != null && ta.DomElement != null)
                 {
-                    doc.InvokeScript("save");
-                    done = true;
-                    // 兜底：确保保存后一定回到查看界面（幂等，防止渲染异常停留在编辑态）
-                    try { doc.InvokeScript("ensureViewMode"); } catch { }
-                }
-            }
-            catch { }
-            if (!done)
-            {
-                // JS 路径失败才回退：直取编辑框内容写盘
-                try
-                {
-                    var doc = browser.Document;
-                    var ta = doc != null ? doc.GetElementById("edit") : null;
-                    if (ta == null) return;
-                    string content = ta.GetAttribute("value");
+                    dynamic dom = ta.DomElement;
+                    string content = (string)dom.value;
                     if (content == null) content = "";
                     SaveCurrentFile(content);
+                    saved = true;
                     try { doc.InvokeScript("afterSave"); } catch { }
                 }
-                catch { }
+            }
+            catch (Exception ex)
+            {
+                if (!saved) MessageBox.Show("保存失败：" + ex.Message, "保存",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            if (!saved)
+            {
+                // C# 直读失败才走页面 JS 兜底
+                try { browser.Document?.InvokeScript("save"); } catch { }
             }
             if (tsEdit != null) tsEdit.Text = "编辑";
             if (tsSave != null) tsSave.Enabled = false;
