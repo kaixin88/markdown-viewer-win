@@ -24,7 +24,7 @@ namespace MarkdownViewer
     public class MainForm : Form, IMessageFilter
     {
         // 版本标识：显示在标题栏，用来一眼确认跑的是不是最新构建
-        private const string VER = "v12";
+        private const string VER = "v13";
         // 自检用：把按键消息直接投递到 IE 子窗口，不依赖前台焦点（keybd_event 在无焦点时会送丢）
         [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
         private static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string lpszClass, string lpszWindow);
@@ -74,6 +74,7 @@ namespace MarkdownViewer
         private ToolStripLabel tsName;
         private string logPath;      // 默认写 %TEMP%\mdviewer.log（排障用），可用 --log= 指定
         private bool synth;          // --synth：自检直接调 ProcessCmdKey，而不是模拟真实按键
+        private HtmlElement editEl;  // 自检用：编辑框元素，每次按键前用它重新夺回 DOM 焦点
         private bool useRealKeys;    // 自检期间用真实按键注入（抢到前台才敢用，否则会打到别人窗口）
 
         public MainForm(string file) : this(file, null, false, false) { }
@@ -563,6 +564,7 @@ namespace MarkdownViewer
                 + "  DomElement=" + (ta != null && ta.DomElement != null)
                 + "  WebBrowserShortcutsEnabled=" + browser.WebBrowserShortcutsEnabled);
             if (ta == null) { Log("CHECK|edit_element|FAIL"); return; }
+            editEl = ta;
 
             // 先抢前台：IE 的编辑类按键（Ctrl+C/V/A）只有在窗口真正获得焦点时才会被处理，
             // 拿不到前台就只能退回 PostMessage（结果可能低估真实能力，日志会写明）。
@@ -575,6 +577,7 @@ namespace MarkdownViewer
             SetEditValue(ta, "SELFTEST-NEW-CONTENT\r\nsecond line");
             ta.Focus();
             Pump(150);
+            bool sent = true;
             if (synth)
             {
                 Log("触发方式：直接调用 ProcessCmdKey（绕过消息队列）");
@@ -583,14 +586,14 @@ namespace MarkdownViewer
             }
             else
             {
-                PressCtrl(VK_S);
+                sent = PressCtrl(VK_S);
             }
             Pump(900);
             string disp = ReadEditDisplay();
-            Log("CHECK|ctrl_s_exit|" + (IsNone(disp) ? "PASS" : "FAIL") + "|edit.display=" + disp);
+            Log("CHECK|ctrl_s_exit|" + Verdict(sent, IsNone(disp)) + "|edit.display=" + disp);
             string onDisk = File.Exists(currentFile) ? File.ReadAllText(currentFile, Encoding.UTF8) : "<不存在>";
             Log("磁盘内容 = " + Esc(onDisk));
-            Log("CHECK|ctrl_s_saved|" + (IndexOf(onDisk, "SELFTEST-NEW-CONTENT") >= 0 ? "PASS" : "FAIL"));
+            Log("CHECK|ctrl_s_saved|" + Verdict(sent, IndexOf(onDisk, "SELFTEST-NEW-CONTENT") >= 0));
 
             if (synth) return;   // synth 只对照 ProcessCmdKey 那条老路径，不测消息泵
 
@@ -603,46 +606,48 @@ namespace MarkdownViewer
             Pump(200);
             SetClip("XYZZY-PASTE-MARK");
             Log("剪贴板已置为 XYZZY-PASTE-MARK；编辑框当前 = " + Esc(GetEditValue(ta)));
-            PressCtrl(VK_V);
+            bool sentV = PressCtrl(VK_V);
             Pump(900);
             string after = GetEditValue(ta);
             Log("粘贴后编辑框 = " + Esc(after));
-            Log("CHECK|ctrl_v_paste|" + (IndexOf(after, "XYZZY-PASTE-MARK") >= 0 ? "PASS" : "FAIL"));
+            Log("CHECK|ctrl_v_paste|" + Verdict(sentV, IndexOf(after, "XYZZY-PASTE-MARK") >= 0));
 
             // ---------- 用例 3：Ctrl+A 全选 ----------
-            PressCtrl(VK_A);
+            bool sentA = PressCtrl(VK_A);
             Pump(500);
-            Log("CHECK|ctrl_a_select|" + (IsAllSelected(ta) ? "PASS" : "FAIL") + "|" + SelInfo(ta));
+            Log("CHECK|ctrl_a_select|" + Verdict(sentA, IsAllSelected(ta)) + "|" + SelInfo(ta));
 
             // ---------- 用例 4：Ctrl+C 复制 ----------
             SetClip("CLEARED-BEFORE-COPY");
-            PressCtrl(VK_C);
+            bool sentC = PressCtrl(VK_C);
             Pump(900);
             string clip = ReadClip();
             Log("复制后剪贴板 = " + Esc(clip));
-            Log("CHECK|ctrl_c_copy|" + (IndexOf(clip, "XYZZY-PASTE-MARK") >= 0 ? "PASS" : "FAIL"));
+            Log("CHECK|ctrl_c_copy|" + Verdict(sentC, IndexOf(clip, "XYZZY-PASTE-MARK") >= 0));
 
             // ---------- 用例 5：Ctrl+X 剪切（全选后剪切，编辑框应变空、剪贴板拿到内容）----------
             SetClip("CLEARED-BEFORE-CUT");
-            PressCtrl(VK_X);
+            bool sentX = PressCtrl(VK_X);
             Pump(900);
             string afterCut = GetEditValue(ta);
             string cutClip = ReadClip();
             Log("剪切后编辑框 = " + Esc(afterCut) + " / 剪贴板 = " + Esc(cutClip));
-            Log("CHECK|ctrl_x_cut|" + ((afterCut != null && afterCut.Length == 0 && IndexOf(cutClip, "XYZZY-PASTE-MARK") >= 0) ? "PASS" : "FAIL"));
+            Log("CHECK|ctrl_x_cut|" + Verdict(sentX,
+                afterCut != null && afterCut.Length == 0 && IndexOf(cutClip, "XYZZY-PASTE-MARK") >= 0));
 
             // ---------- 用例 6：普通打字回归（确认消息泵拦截没有影响正常输入）----------
             if (useRealKeys)
             {
                 SetEditValue(ta, "");
                 CaretToEnd(ta);
-                ta.Focus();
-                Pump(200);
+                bool held = HoldForeground("普通打字");
+                RefocusEdit();
+                Pump(150);
                 TypeChar(VK_A); TypeChar(0x42 /*B*/); TypeChar(0x43 /*C*/);
                 Pump(600);
                 string typed = GetEditValue(ta);
                 Log("打字后编辑框 = " + Esc(typed));
-                Log("CHECK|plain_typing|" + (IndexOf(typed, "abc") >= 0 ? "PASS" : "FAIL"));
+                Log("CHECK|plain_typing|" + Verdict(held, IndexOf(typed, "abc") >= 0));
             }
             else
             {
@@ -650,9 +655,12 @@ namespace MarkdownViewer
             }
         }
 
-        // 注入一个普通字符（不带 Ctrl），验证正常打字没被消息泵拦截影响
+        // 注入一个普通字符（不带 Ctrl），验证正常打字没被消息泵拦截影响。
+        // 同样每次都做前台守卫：真实按键只送前台窗口，焦点跑了就会打到别的程序上。
         private void TypeChar(int vk)
         {
+            if (!HoldForeground("打字 0x" + vk.ToString("X2"))) { Log("TypeChar: 未持有前台，跳过"); return; }
+            RefocusEdit();
             keybd_event((byte)vk, (byte)ScanCode(vk), 0, IntPtr.Zero);
             Pump(40);
             keybd_event((byte)vk, (byte)ScanCode(vk), KEYEVENTF_KEYUP, IntPtr.Zero);
@@ -677,9 +685,9 @@ namespace MarkdownViewer
         //   （WebBrowser → Shell DocObject View → Internet Explorer_Server），
         //   FindWindowEx 只找直接子窗口，所以必须递归往下找，否则投到 WebBrowser 自己身上，
         //   编辑类按键（Ctrl+C/V/A）根本到不了文档 —— 会误判成"功能坏了"。
-        private void PressCtrl(int vk)
+        private bool PressCtrl(int vk)
         {
-            if (useRealKeys) { PressCtrlReal(vk); return; }
+            if (useRealKeys) return PressCtrlReal(vk);
 
             IntPtr ieHwnd = FindDescendant(browser.Handle, "Internet Explorer_Server");
             IntPtr target = ieHwnd != IntPtr.Zero ? ieHwnd : browser.Handle;
@@ -694,12 +702,25 @@ namespace MarkdownViewer
             PostMessage(target, (uint)WM_KEYUP, (IntPtr)vk, (IntPtr)up);
             System.Threading.Thread.Sleep(30);
             PostMessage(target, (uint)WM_KEYUP, (IntPtr)VK_CONTROL_, (IntPtr)0xC01D0001L);
+            return true;
         }
 
         // 真实按键注入：完全走用户那条路径（前台窗口 + 真实输入队列），保真度最高。
-        // 前提是本窗口已抢到前台，否则会打到别人的窗口上 —— 所以调用前必须 EnsureForeground 成功。
-        private void PressCtrlReal(int vk)
+        //
+        // ★ 踩过的坑（v12 台架翻车实录）：keybd_event 只把按键送进**当时的前台窗口**，
+        //   而 AttachThreadInput 一解除，系统立刻把前台还给原来那个窗口。
+        //   于是"只在开头抢一次前台"的写法会退化成：第一个按键命中，后面全打到别的程序上。
+        //   实测日志里能直接看到 Ctrl+C 复制到的是**另一个窗口的文字**，还因此误报过 PASS。
+        //   修法：按下每个键**之前**都重新校验并夺回前台；实在抢不到就返回 false，
+        //   由调用方记为 SKIP —— 台架拿不到前台是环境问题，绝不能报成"功能坏了"。
+        private bool PressCtrlReal(int vk)
         {
+            if (!HoldForeground("Ctrl+0x" + vk.ToString("X2")))
+            {
+                Log("PressCtrlReal: 未持有前台，本次按键不注入（记 SKIP）");
+                return false;
+            }
+            RefocusEdit();
             Log("PressCtrlReal(真实按键): vk=0x" + vk.ToString("X2") + " scan=0x" + ScanCode(vk).ToString("X2"));
             keybd_event((byte)VK_CONTROL_, 0x1D, 0, IntPtr.Zero);
             Pump(60);
@@ -708,6 +729,34 @@ namespace MarkdownViewer
             keybd_event((byte)vk, (byte)ScanCode(vk), KEYEVENTF_KEYUP, IntPtr.Zero);
             Pump(60);
             keybd_event((byte)VK_CONTROL_, 0x1D, KEYEVENTF_KEYUP, IntPtr.Zero);
+            return true;
+        }
+
+        // 每次按键/打字前的前台守卫：已是前台直接放行，被抢走了就再夺一次。
+        private bool HoldForeground(string tag)
+        {
+            IntPtr fg = GetForegroundWindow();
+            if (fg == this.Handle) return true;
+            Log("HoldForeground(" + tag + "): 前台已变成 " + fg.ToString("X") + "，重新夺回");
+            return EnsureForeground();
+        }
+
+        // 夺回前台后，IE 可能把输入焦点落回默认元素，这里把焦点重新交给编辑框。
+        private void RefocusEdit()
+        {
+            try
+            {
+                if (editEl != null) editEl.Focus();
+            }
+            catch { }
+            Pump(60);
+        }
+
+        // 判据封装：注入没送出去（前台被抢）时报 SKIP，绝不报 FAIL。
+        private static string Verdict(bool sent, bool pass)
+        {
+            if (!sent) return "SKIP|未持有前台，按键未注入";
+            return pass ? "PASS" : "FAIL";
         }
 
         // 抢前台：本进程不是"最后输入"的进程时 SetForegroundWindow 会被系统拒绝，
