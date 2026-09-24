@@ -12,3 +12,7 @@ app_probe.js
 probe_test.js
 build_probe.js
 push.js
+download_artifact.js
+verify_install.js
+wait_build.js
+dbg.sh
