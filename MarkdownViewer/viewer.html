@@ -598,12 +598,19 @@
 
     step(function(){
       var ta=document.getElementById('edit');
+      // 诊断（只在按住 Ctrl 时记录，正常打字不写日志）：
+      // 用来区分"按键被 IE 加速键吃掉（这里不会有记录）"和"按键到了编辑框但没人处理"。
       ta.onkeydown=function(e){
-        if((e.ctrlKey||e.metaKey) && (e.key==='s'||e.keyCode===83)){
-          notifyLog('textarea 捕获 Ctrl+S (keyCode='+(e.keyCode||'')+') -> 走页面 save()');
+        var k=e.keyCode||0;
+        if(e.ctrlKey||e.metaKey) notifyLog('textarea onkeydown Ctrl+keyCode='+k);
+        if((e.ctrlKey||e.metaKey) && (e.key==='s'||k===83)){
+          notifyLog('textarea 捕获 Ctrl+S -> 走页面 save()');
           if(e.preventDefault) e.preventDefault(); else e.returnValue=false;
           save();
         }
+      };
+      document.onkeydown=function(e){
+        if((e.ctrlKey||e.metaKey) && (e.keyCode||0)!==83) notifyLog('document onkeydown Ctrl+keyCode='+(e.keyCode||0));
       };
     });
 

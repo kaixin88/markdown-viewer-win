@@ -3,6 +3,10 @@ obj/
 .vs/
 *.user
 
+# 本机构建产物（build_local.sh 生成）
+dist/
+build_local.rsp
+
 # 本地调试脚本，不进版本库
 app_probe.js
 probe_test.js
